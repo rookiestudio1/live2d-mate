@@ -73,10 +73,26 @@ private slots:
     QCOMPARE(id.substr(id.size() - std::string("/Foo.model3.json").size()), std::string("/Foo.model3.json"));
   }
 
-  // 已經是絕對路徑時，externalModelId 就等於正規化
+  // 已經是絕對路徑時，externalModelId 就等於正規化。
+  //
+  // **輸入的路徑形狀要分平台**：「什麼叫絕對路徑」本來就是平台定義的。
+  // "E:/a/b" 在 Windows 上是絕對路徑，在 POSIX 上只是一個名字裡剛好有冒號的
+  // **相對**路徑 —— 於是 externalModelId 會照它的職責把它接到工作目錄後面，
+  // 得到 "/home/runner/.../build/E:/a/./b/Foo.model3.json" 而紅在這一行。
+  // 這條在 linux job 的建置修好之前從來沒被執行過，所以擺到現在才發現。
+  //
+  // **判定那半邊刻意不分平台**：isExternalModelId 在哪個平台都認得磁碟機代號
+  //（core/external_model.h 寫明是字串判定而不是 is_absolute()，同一份
+  // config.json 才會在兩個平台得到同一個答案）。會因平台而異的只有
+  // 「把相對路徑補成絕對」這個動作，所以只換輸入資料，斷言的形狀維持一致。
   void externalIdKeepsAbsolutePath() {
+#ifdef Q_OS_WIN
     const std::string id = externalModelId("E:\\a\\.\\b\\Foo.model3.json");
     QCOMPARE(id, std::string("E:/a/b/Foo.model3.json"));
+#else
+    const std::string id = externalModelId("/a/./b/Foo.model3.json");
+    QCOMPARE(id, std::string("/a/b/Foo.model3.json"));
+#endif
     QVERIFY(isExternalModelId(id));
   }
 
