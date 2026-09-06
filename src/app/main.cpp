@@ -39,6 +39,7 @@
 #include "../windows/tray.h"
 #include "../platform/autostart.h"
 #include "../platform/crash_handler.h"
+#include "../windows/sample_models_prompt.h"
 #include "../windows/window_manager.h"
 #include "app_controller.h"
 #include "logging.h"
@@ -52,6 +53,7 @@
 #include "core/persona.h"
 #include "core/persona_doc.h"
 #include "core/persona_memory.h"
+#include "core/sample_models.h"
 #include "core/i18n.h"
 #include "core/tts_manager.h"
 #include "core/weather_alert.h"
@@ -725,6 +727,20 @@ int main(int argc, char* argv[]) {
     settings.close();
     config.flush();
   });
+
+  // 一隻模型都沒有時問一句要不要去官網抓免費模型（規則與網址在 core/sample_models.h）。
+  //
+  // **排進事件迴圈才開**：QMessageBox::exec() 是巢狀事件迴圈，在這裡直接呼叫
+  // 會把後面的 app.exec() 連同已經建好的系統匣、MCP 伺服器一起卡住等使用者按鍵，
+  // 症狀是「開起來只有一個對話框，關掉之後才慢慢長出系統匣圖示」。
+  //
+  // 旗標在**開之前**就寫進 config：寫在對話框關掉之後的話，使用者按 Esc 或
+  // 直接叉掉視窗（那條路不會回到 clickedButton 的判斷之外，但行程若在對話框
+  // 開著時被關掉就整個沒寫到）下次啟動又會再跳一次。
+  if (l2m::shouldOfferSampleModels(!controller.models().empty(), config.get().app.sampleModelsPrompted, startHidden)) {
+    config.patch(l2m::boolPatch("app", "sampleModelsPrompted", true));
+    QTimer::singleShot(0, &app, [&controller, modelsDir] { l2m::promptForSampleModels(controller.uiLocale(), modelsDir); });
+  }
 
   const int result = app.exec();
   config.flush();

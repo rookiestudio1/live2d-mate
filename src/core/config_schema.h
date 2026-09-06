@@ -230,6 +230,9 @@ struct AppSectionConfig {
   bool disableHardwareAcceleration = false;
   // UI 語系；'auto' 依系統語系決定
   std::string locale = "auto";
+  // 「一隻模型都沒有」的引導對話框問過了沒（core/sample_models.h）。
+  // 只記「問過」不記答案 —— 使用者選了「稍後再說」也不該每次啟動再問一次。
+  bool sampleModelsPrompted = false;
 };
 
 // 角色描述。描述本文不放在這裡 —— 它是 personas/<名稱>.md 那個檔案，

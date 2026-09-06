@@ -291,6 +291,7 @@ std::optional<AppConfig> parseConfig(yyjson_val* root, std::vector<std::string>*
     readBool(ctx, app, "alwaysOnTop", config.app.alwaysOnTop, "app.alwaysOnTop");
     readBool(ctx, app, "disableHardwareAcceleration", config.app.disableHardwareAcceleration, "app.disableHardwareAcceleration");
     readEnum(ctx, app, "locale", config.app.locale, localeSettings(), "app.locale");
+    readBool(ctx, app, "sampleModelsPrompted", config.app.sampleModelsPrompted, "app.sampleModelsPrompted");
   }
 
   if (yyjson_val* persona = section(ctx, root, "persona")) {
@@ -461,6 +462,8 @@ std::string serializeConfig(const AppConfig& config, bool pretty) {
     putBool(doc, app, "alwaysOnTop", config.app.alwaysOnTop);
     putBool(doc, app, "disableHardwareAcceleration", config.app.disableHardwareAcceleration);
     putStr(doc, app, "locale", config.app.locale);
+    // 新欄位一律接在既有鍵後面（見 CLAUDE.md 的 serializeConfig 合約）
+    putBool(doc, app, "sampleModelsPrompted", config.app.sampleModelsPrompted);
   }
   {
     // 新增的 section 一律接在最後（見 config_schema.h 的說明）；

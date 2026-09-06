@@ -372,6 +372,7 @@ add_library(
   src/core/perform_step.h
   src/core/perform_step.cpp
   src/core/perform_sync.cpp
+  src/core/sample_models.cpp
   src/core/tts_types.h
   src/core/voice_list.h
   src/core/voice_list.cpp
@@ -534,6 +535,8 @@ if(L2M_BUILD_APP)
       src/windows/character_window.cpp
       src/windows/window_manager.h
       src/windows/window_manager.cpp
+      src/windows/sample_models_prompt.h
+      src/windows/sample_models_prompt.cpp
       src/windows/tray.h
       src/windows/tray.cpp
       src/windows/bubble_window.h
@@ -978,6 +981,7 @@ if(L2M_BUILD_TESTS)
   l2m_add_test(test_png_probe)
   l2m_add_test(test_layout_fit)
   l2m_add_test(test_perform_sync)
+  l2m_add_test(test_sample_models)
 endif()
 
 # ---------------------------------------------------------------------------
