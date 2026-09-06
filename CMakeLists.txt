@@ -767,14 +767,19 @@ if(L2M_BUILD_APP)
         RENAME LICENSE.Live2DCubismCore.md)
     endif()
 
-    # Qt 是 LGPL v3，散布 binary 要附授權全文。Qt 的安裝樹版面各版不同，找得到的
-    # 那一份由 CI 在 **configure 之前**複製到這裡（見 .github/workflows/release.yml）。
+    # Qt 是 LGPL v3，散布 binary 要附授權全文。那兩份全文（LGPL-3.0 與 GPL-3.0）
+    # 就在 repo 裡的 third_party/qt-licenses/，不是建置期才生出來的東西 ——
+    # 原本是由 CI 從 Qt 安裝樹複製，但 CI 的 aqtinstall 只下載模組二進位、
+    # 從來不帶授權文字，那條路每一輪都找不到而靜靜出貨一個缺全文的包。
+    # 完整理由寫在該目錄的 README.md。
     #
-    # 為什麼要繞這一圈、不在 cmake --install 之後直接複製進 dist/：
+    # 為什麼要走 install() 規則、不在 cmake --install 之後直接複製進 dist/：
     # NSIS 安裝檔是 cpack **自己重跑一遍 install 規則**產生的，外面補進 dist/ 的
     # 檔案它看不到。走 install() 規則，zip 與安裝檔才會拿到同一份內容 ——
     # 不然就會出現「zip 有 LGPL 全文、安裝檔沒有」這種發布之後才有人發現的差異。
-    # 開發機沒有這個目錄，整條規則就不存在（本機建置本來就不是散布）。
+    # EXISTS 的護欄留著當保險：目錄現在一定在（跟著 repo 走），但萬一有人把它
+    # 剪掉，install(DIRECTORY) 對不存在的來源是硬錯誤。真正的把關在 release.yml
+    # 的 Verify Qt license texts —— 缺了就讓發布當場失敗，而不是靜靜少一份。
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/qt-licenses")
       install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/third_party/qt-licenses/"
               DESTINATION Qt-LICENSES)

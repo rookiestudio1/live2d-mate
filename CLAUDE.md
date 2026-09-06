@@ -91,7 +91,9 @@ CI 在 `.github/workflows/`：`tests.yml` 每次 push/PR 跑測試（`L2M_BUILD_
 產出 **NSIS 安裝檔 + 便攜版 zip + 完整 pdb** 三個資產。
 安裝檔是 `cpack` **重跑一遍 install 規則**做出來的，不是壓 `dist/` ——
 所以要出貨的東西一律加成 `install()` 規則，事後補進 `dist/` 的檔案只會進 zip
-（Qt 的 LGPL 全文原本就是那樣補的，已改成由 `third_party/qt-licenses/` 走 install 規則）。
+（Qt 的 LGPL 全文原本就是那樣補的，已改成由 `third_party/qt-licenses/` 走 install 規則；
+那兩份全文**直接進 repo**，不再從 Qt 安裝樹複製 —— CI 的 aqtinstall 只給模組二進位、
+從來不帶授權文字，舊作法每一輪都找不到而靜靜出貨一個缺全文的包）。
 安裝檔顯示的版本走 `L2M_PACKAGE_VERSION`（預設 `project()` 的版本，CI 以 tag 覆蓋）。
 授權：原始碼 MIT（`LICENSE`），binary 因為含 Cubism Core 與 Qt 不是 —— 見 `THIRD_PARTY_NOTICES.md`。
 

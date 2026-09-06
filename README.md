@@ -25,6 +25,22 @@ speak a line with lip-sync, or run a whole scripted performance.
 
 Written in **Qt 6 / C++17** with the Live2D **Cubism SDK for Native 5-r.5**.
 
+## Demo
+
+<div align="center">
+
+**Claude Code** — the character comments on the work while the AI reads through the codebase.
+
+<a href="https://youtu.be/j2IgsYYetMk"><img src="docs/images/demo-claude-code.gif" width="860" alt="Claude Code driving the character over MCP"></a>
+
+**Claude Desktop** — the same MCP server, a different client.
+
+<a href="https://youtu.be/K00ztF_hfYQ"><img src="docs/images/demo-claude-desktop.gif" width="860" alt="Claude Desktop driving the character over MCP"></a>
+
+Full videos on YouTube — [Claude Desktop demo](https://youtu.be/K00ztF_hfYQ) · [Claude Code Demo 1](https://youtu.be/21ekLl3kAjs) · [Claude Code Demo 2](https://youtu.be/j2IgsYYetMk)
+
+</div>
+
 ## Features
 
 | | |

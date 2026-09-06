@@ -8,6 +8,12 @@
 # 混進 repo 之後每次有人打開表單就是整檔 diff。釘成 LF。
 *.ui text eol=lf
 
+# GPL / LGPL 的授權全文必須逐字保留 —— 文件自己就寫著「Everyone is permitted to
+# copy and distribute verbatim copies of this license document, but changing it
+# is not allowed」。釘成 LF，不讓 core.autocrlf=true 的機器在 checkout 時改寫，
+# 也讓每台機器打包出來的那兩份位元組完全一致。
+third_party/qt-licenses/*.txt text eol=lf
+
 # 預設角色的內容經 qrc 編進二進位檔，再被種到使用者磁碟上。
 # 不釘的話不同機器 checkout 出來的行尾不一致，種出去的 Default.md 也跟著飄。
 resources/personas/*.md text eol=lf

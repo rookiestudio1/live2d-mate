@@ -106,34 +106,39 @@ jobs:
           Copy-Item "$($core.FullName)/LICENSE.md" "$dst/LICENSE.md" -Force
           Get-ChildItem -Recurse $dst | Select-Object FullName
 
-      # Qt 是 LGPL v3，散布 binary 要附授權全文。Qt 的安裝版面各版不同，
-      # 找得到就複製，找不到就出警告而不是讓整個發布失敗 —— 但**發布前要自己確認**
-      # 產出的包裡真的有那幾份（見 THIRD_PARTY_NOTICES.md 的 Qt 段）。
+      # Qt 是 LGPL v3，散布 binary 要附授權全文（見 THIRD_PARTY_NOTICES.md 的 Qt 段）。
+      # 那兩份全文放在 repo 的 third_party/qt-licenses/，由 CMakeLists.txt 的
+      # install(DIRECTORY) 規則帶進 zip 與安裝檔 —— 走 install() 而不是事後補進
+      # dist/，因為 NSIS 安裝檔是 cpack 自己重跑一遍 install 規則產生的，
+      # 補在外面的檔案它看不到。
       #
-      # **這一步必須排在 Configure 之前**，而且目的地是原始碼樹而不是 dist/：
-      # NSIS 安裝檔是 cpack 自己重跑一遍 install 規則產生的，事後補進 dist/ 的
-      # 檔案它看不到。改成由 CMakeLists.txt 的 install(DIRECTORY) 規則帶走，
-      # zip 與安裝檔才會拿到同一份東西。那條規則是 EXISTS 判斷的，所以這裡
-      # 必須先放好檔案 configure 才看得到。
-      - name: Collect Qt license texts
+      # 這一步原本是「去 Qt 安裝樹找 LICENSES/ 複製過來」，已經整段拿掉，兩個理由：
+      #   ① 那是 Qt **官方線上安裝器**的版面。CI 用的 install-qt-action（底層是
+      #      aqtinstall）只下載模組二進位，從來不帶授權文字 —— 那條路在 CI 上
+      #      永遠找不到，每一輪印一句警告然後靜靜出貨一個缺全文的包。
+      #   ② 舊版開頭那句 Remove-Item $dst -Recurse -Force 會**先把 repo 裡的全文
+      #      刪掉**再去找。全文進了 repo 之後還留著它，等於每輪親手製造出
+      #      它本來要防的那個問題。
+      # 現在只剩驗證。刻意用 ::error:: 而不是 ::warning:: —— 缺了就是散布時的
+      # 授權義務沒盡到，那種事不該靠人記得去檢查。
+      - name: Verify Qt license texts
         shell: pwsh
         run: |
-          $dst = "third_party/qt-licenses"
-          # 先清掉：Copy-Item -Recurse 在目的地**已存在**時是「複製到裡面」而不是
-          # 「取代」，重跑一次就會變成 qt-licenses/LICENSES/…，安裝包裡跟著多一層，
-          # 而且完全不會有訊息。乾淨的 runner 碰不到，重用工作區的才會。
-          if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
-          $found = $false
-          foreach ($p in @("$env:QT_ROOT_DIR/LICENSES", "$env:QT_ROOT_DIR/../../Licenses")) {
-            if (Test-Path $p) {
-              Copy-Item $p $dst -Recurse -Force
-              $found = $true
-              break
+          $dir = "third_party/qt-licenses"
+          foreach ($f in @("LGPL-3.0.txt", "GPL-3.0.txt")) {
+            $target = Join-Path $dir $f
+            if (-not (Test-Path $target)) {
+              Write-Host "::error::找不到 $target —— 散布 binary 必須附上 Qt 的 LGPL v3 與 GPL v3 全文。"
+              exit 1
             }
-          }
-          if (-not $found) {
-            Write-Host "::warning::在 Qt 安裝目錄裡找不到授權文字，產出的包不會有 LGPL 全文。"
-            Write-Host "::warning::發布前請自行補上 LGPLv3 與 GPLv3 的全文。"
+            # 只擋「檔案在、但是空的或被截斷」這種最容易漏掉的壞法。
+            # gnu.org 的原檔大小：LGPL-3.0 為 7652、GPL-3.0 為 35149 位元組。
+            $size = (Get-Item $target).Length
+            if ($size -lt 5000) {
+              Write-Host "::error::$target 只有 $size 位元組，不像完整的授權全文。"
+              exit 1
+            }
+            Write-Host "$f  $size 位元組"
           }
 
       # NSIS 在 GitHub 的 windows image 裡本來就有，但 image 的內容是會變的，

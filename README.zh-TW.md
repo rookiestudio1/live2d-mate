@@ -24,6 +24,22 @@ Gemini CLI 等 MCP 客戶端可以直接驅動角色 —— 播動作、換表�
 
 以 **Qt 6 / C++17** 實作，搭配 Live2D **Cubism SDK for Native 5-r.5**。
 
+## 展示
+
+<div align="center">
+
+**Claude Code** —— AI 一邊讀程式碼，角色一邊在旁邊出聲。
+
+<a href="https://youtu.be/j2IgsYYetMk"><img src="docs/images/demo-claude-code.gif" width="860" alt="Claude Code 透過 MCP 驅動角色"></a>
+
+**Claude Desktop** —— 同一台 MCP 伺服器，換一個客戶端。
+
+<a href="https://youtu.be/K00ztF_hfYQ"><img src="docs/images/demo-claude-desktop.gif" width="860" alt="Claude Desktop 透過 MCP 驅動角色"></a>
+
+完整影片（YouTube）—— [Claude Desktop demo](https://youtu.be/K00ztF_hfYQ) · [Claude Code Demo 1](https://youtu.be/21ekLl3kAjs) · [Claude Code Demo 2](https://youtu.be/j2IgsYYetMk)
+
+</div>
+
 ## 功能
 
 | | |
