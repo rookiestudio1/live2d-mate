@@ -1,0 +1,10 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "generic.moc3",
+    "Textures": ["texture_00.png"],
+    "Motions": {
+      "Idle": [{ "File": "idle.motion3.json" }]
+    }
+  }
+}

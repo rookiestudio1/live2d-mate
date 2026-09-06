@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  開機自啟用的 launchd agent，由 SMAppService.agentServiceWithPlistName 註冊，
+	  隨 app bundle 放在 Contents/Library/LaunchAgents/。
+
+	  為什麼不用 SMAppService.mainAppService（比較短的那條路）：
+	  mainAppService 註冊的是 app bundle 本身，launchd 不帶任何參數把它叫起來，
+	  收不到 --hidden，登入自啟就會整隻角色跳出來。改成自己帶一份 agent plist，
+	  ProgramArguments 就能像 Windows 的 HKCU\...\Run 一樣把旗標寫死進去，
+	  兩個平台的 shouldStartHidden() 因此可以是同一份純 argv 邏輯。
+
+	  BundleProgram 是「相對於 bundle 的路徑」，所以使用者把 .app 搬到哪都還能跑；
+	  寫絕對路徑的話搬一次就壞了。
+	-->
+	<key>Label</key>
+	<string>com.live2dmate.app.login</string>
+
+	<key>BundleProgram</key>
+	<string>Contents/MacOS/live2d_mate</string>
+
+	<!-- argv[0] 照慣例放程式名，真正有意義的是後面那個旗標 -->
+	<key>ProgramArguments</key>
+	<array>
+		<string>live2d_mate</string>
+		<string>--hidden</string>
+	</array>
+
+	<key>RunAtLoad</key>
+	<true/>
+
+	<!--
+	  沒有這個鍵，macOS 13+ 的「系統設定 → 一般 → 登入項目」會把它顯示成
+	  com.live2dmate.app.login 這種原始 label，使用者根本不知道那是什麼。
+	  關聯到 bundle id 之後才會顯示成 Live2D Mate。
+	-->
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>com.live2dmate.app</string>
+	</array>
+</dict>
+</plist>

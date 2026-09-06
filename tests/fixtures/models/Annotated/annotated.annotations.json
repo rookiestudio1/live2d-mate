@@ -1,0 +1,9 @@
+{
+  "motions": {
+    "idle": "站著發呆",
+    "tap_body#1": "被戳肚子會笑"
+  },
+  "expressions": {
+    "f01": "微笑"
+  }
+}

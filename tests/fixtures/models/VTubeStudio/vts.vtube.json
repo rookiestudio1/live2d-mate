@@ -1,0 +1,16 @@
+{
+  "Version": 8,
+  "Name": "VTubeStudio",
+  "FileReferences": {
+    "Icon": "",
+    "Model": "vts.model3.json",
+    "IdleAnimation": "idle_loop.motion3.json",
+    "IdleAnimationWhenTrackingLost": ""
+  },
+  "Hotkeys": [
+    { "Name": "愛心眼", "Action": "ToggleExpression", "File": "heart.exp3.json" },
+    { "Name": "臉紅", "Action": "ToggleExpression", "File": "blush.exp3.json" },
+    { "Name": "歸零", "Action": "RemoveAllExpressions", "File": "" },
+    { "Name": "缺檔的", "Action": "ToggleExpression", "File": "missing.exp3.json" }
+  ]
+}

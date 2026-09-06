@@ -1,0 +1,9 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "vts.moc3",
+    "Textures": ["vts.4096/texture_00.png"],
+    "Physics": "vts.physics3.json",
+    "DisplayInfo": "vts.cdi3.json"
+  }
+}

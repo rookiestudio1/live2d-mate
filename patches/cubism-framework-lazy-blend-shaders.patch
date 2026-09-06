@@ -1,0 +1,205 @@
+CubismNativeFramework 5-r.5：混合模式 shader 改成延遲產生
+=========================================================
+
+症狀：冷啟動時 CreateRenderer 要 2.9~3.0 秒，整個 GUI 執行緒卡在那裡。
+
+根因：5-r.5 的 CubismShader_OpenGLES2::GenerateShaders() 會把
+ColorBlendMode_Count(16) × AlphaBlendMode_Count(5) − 1 = 79 組、
+每組 6 支，共 474 支混合模式 shader 一次全部 compile + link，
+加上 Copy / SetupMask / Normal 那 8 支，總共 482 支。
+
+實測（RelWithDebInfo，huohuo，NVIDIA 桌面驅動）：
+  CreateRenderer 2995 ms
+    其中讀檔 1912 次 / 137 ms / 5604 KB（每支混合 shader 要讀
+    vert、frag、colorBlend、alphaBlend 四個檔）
+    其餘約 2858 ms 全是驅動在編譯 GLSL
+絕大多數模型一個混合模式都沒用到，這 474 支等於全白編。
+
+修法：GenerateShaders() 只留下必用的 8 支，混合模式改成第一次真的
+被索引到時，由新增的 EnsureBlendShaderSet() 一支一支補上。消費端只有
+兩處（SetupShaderProgramForDrawable、SetupShaderProgramForOffscreen），
+SetupMask 與 Copy 用的都在預先產生的那 8 支裡。
+Android ES2 分支維持原本的預先產生，完全不受影響。
+
+結果：CreateRenderer 2995 ms → 66 ms（讀檔 1912 → 16 次），
+整段 load 5680 ms → 2365 ms。
+
+驗證：
+- 索引逆推：對全部 474 個索引模擬原迴圈的產生順序並與逆推結果比對，
+  0 筆不符。
+- GL 端：臨時在 GenerateShaders() 尾端強制跑完全部 474 支，
+  glGetProgramiv(GL_LINK_STATUS) 得到 ok=474 ng=0，
+  且讀檔次數回到 1912、耗時 2420 ms，與原版等價。
+- 另有 static_assert 釘住「(16×5−1)×6」這個排列，上游若改版會先編不過，
+  而不是默默錯位拿到別支 shader。
+
+已知取捨：真的有用到混合模式的模型，第一次畫到時會就地編一支（實測約
+6 ms，掉一幀），之後就都在了。
+
+套用方式見 cmake/FetchCubismFramework.cmake，每次 configure 會自動確認。
+
+授權：本檔是對 CubismNativeFramework 5-r.5 的 unified diff，context 行與被移除的行
+就是 Live2D 的原始碼，所以**這一份不適用本專案的 MIT 授權**，而是跟上游一樣受
+Live2D Open Software License 規範（見 THIRD_PARTY_NOTICES.md 第 1 節）：
+https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html
+
+diff --git a/src/Rendering/OpenGL/CubismShader_OpenGLES2.cpp b/src/Rendering/OpenGL/CubismShader_OpenGLES2.cpp
+index 4ed5f6a..b6f09a9 100644
+--- a/src/Rendering/OpenGL/CubismShader_OpenGLES2.cpp
++++ b/src/Rendering/OpenGL/CubismShader_OpenGLES2.cpp
+@@ -442,24 +442,11 @@ void CubismShader_OpenGLES2::GenerateShaders()
+     _shaderSets[ShaderNames_MultMaskedPremultipliedAlpha]->ShaderProgram = _shaderSets[ShaderNames_NormalMaskedPremultipliedAlpha]->ShaderProgram;
+     _shaderSets[ShaderNames_MultMaskedInvertedPremultipliedAlpha]->ShaderProgram = _shaderSets[ShaderNames_NormalMaskedInvertedPremultipliedAlpha]->ShaderProgram;
+ 
+-    // ブレンドモードの組み合わせ分作成
+-    {
+-        csmUint32 offset = ShaderNames_NormalAtop;
+-        for (csmInt32 i = 0; i < ColorBlendMode_Count; ++i)
+-        {
+-            // Normal Overはシェーダを作る必要がないため 1 から始める
+-            const csmInt32 start = (i == 0 ? 1 : 0);
+-            for (csmInt32 j = start; j < AlphaBlendMode_Count; ++j)
+-            {
+-                _shaderSets[offset++]->ShaderProgram = LoadShaderProgramFromFile("FrameworkShaders/VertShaderSrcBlend.vert", "FrameworkShaders/FragShaderSrcBlend.frag", i, j);
+-                _shaderSets[offset++]->ShaderProgram = LoadShaderProgramFromFile("FrameworkShaders/VertShaderSrcMaskedBlend.vert", "FrameworkShaders/FragShaderSrcMaskBlend.frag", i, j);
+-                _shaderSets[offset++]->ShaderProgram = LoadShaderProgramFromFile("FrameworkShaders/VertShaderSrcMaskedBlend.vert", "FrameworkShaders/FragShaderSrcMaskInvertedBlend.frag", i, j);
+-                _shaderSets[offset++]->ShaderProgram = LoadShaderProgramFromFile("FrameworkShaders/VertShaderSrcBlend.vert", "FrameworkShaders/FragShaderSrcPremultipliedAlphaBlend.frag", i, j);
+-                _shaderSets[offset++]->ShaderProgram = LoadShaderProgramFromFile("FrameworkShaders/VertShaderSrcMaskedBlend.vert", "FrameworkShaders/FragShaderSrcMaskPremultipliedAlphaBlend.frag", i, j);
+-                _shaderSets[offset++]->ShaderProgram = LoadShaderProgramFromFile("FrameworkShaders/VertShaderSrcMaskedBlend.vert", "FrameworkShaders/FragShaderSrcMaskInvertedPremultipliedAlphaBlend.frag", i, j);
+-            }
+-        }
+-    }
++    // [live2d_mate patch] 混合模式的 474 支 shader 不在這裡預先產生。
++    // 原版在此把 16 × 5 − 1 = 79 組 × 6 支一次編譯連結完，實測 CreateRenderer
++    // 要 2995 ms（其中讀檔只佔 137 ms，其餘約 2.86 秒全是驅動在編譯 GLSL）。
++    // 絕大多數模型一個混合模式都沒用到，所以改成第一次真的要用時，
++    // 由 EnsureBlendShaderSet() 一支一支補上。
+ #endif
+ 
+     // Copy
+@@ -515,6 +502,9 @@ void CubismShader_OpenGLES2::GenerateShaders()
+     // 乗算（クリッピング・反転、PremultipliedAlpha）
+     SetShaderSet(*_shaderSets[ShaderNames_MultMaskedInvertedPremultipliedAlpha], MaskType_MaskedInvertedPremultipliedAlpha);
+ 
++#ifdef CSM_TARGET_ANDROID_ES2
++    // [live2d_mate patch] Android ES2 仍走原本的預先產生，所以位置查詢也留在這裡。
++    // 桌面版的混合模式改由 EnsureBlendShaderSet() 產生，那裡會自己呼叫 SetShaderSet。
+     // ブレンドモードの組み合わせ分作成
+     {
+         csmUint32 offset = ShaderNames_NormalAtop;
+@@ -539,6 +529,80 @@ void CubismShader_OpenGLES2::GenerateShaders()
+             }
+         }
+     }
++#endif
++}
++
++// [live2d_mate patch] 混合模式 shader 的延遲產生。
++//
++// GenerateShaders() 產生順序的逆推：ShaderNames_NormalAtop 之後每 6 個一組
++//（遮罩無／有／有反轉 × 是否乘算済アルファ），組的排列是先 (i=0, j=1..4)
++// 四組，之後才是 (i=1..15, j=0..4) 每個顏色模式各五組 —— 因為 Normal Over
++// 用的就是 ShaderNames_Normal 那支，不必另外產生。
++//
++// 一次只補一支（不是整組六支）：一個 drawable 只會用到其中一種遮罩組合，
++// 補整組等於白編五支。實測單支約 6 ms，第一次用到時掉一幀，之後就都有了。
++void CubismShader_OpenGLES2::EnsureBlendShaderSet(const csmInt32 shaderName)
++{
++#ifndef CSM_TARGET_ANDROID_ES2
++    // 逆推的前提：混合模式區塊剛好是 (16 × 5 − 1) 組 × 6 支。
++    // 上游若改了排列（例如新增顏色模式）這裡會先編不過，而不是默默錯位拿到別支 shader。
++    static_assert(
++        (ShaderNames_ShaderCount - ShaderNames_NormalAtop) == (ColorBlendMode_Count * AlphaBlendMode_Count - 1) * 6,
++        "[live2d_mate patch] blend shader layout changed; EnsureBlendShaderSet() must be revisited");
++
++    // 混合模式以外的都在 GenerateShaders() 產生完了
++    if (shaderName < ShaderNames_NormalAtop || shaderName >= ShaderNames_ShaderCount)
++    {
++        return;
++    }
++    if (_shaderSets[shaderName]->ShaderProgram)
++    {
++        return;
++    }
++
++    const csmInt32 sequence = shaderName - ShaderNames_NormalAtop;
++    const csmInt32 group = sequence / 6;
++    const csmInt32 variant = sequence % 6;
++
++    csmInt32 colorBlendMode;
++    csmInt32 alphaBlendMode;
++    if (group < AlphaBlendMode_Count - 1)
++    {
++        colorBlendMode = 0;
++        alphaBlendMode = group + 1;  // Normal は Over を飛ばす
++    }
++    else
++    {
++        const csmInt32 rest = group - (AlphaBlendMode_Count - 1);
++        colorBlendMode = rest / AlphaBlendMode_Count + 1;
++        alphaBlendMode = rest % AlphaBlendMode_Count;
++    }
++
++    // 這兩張表的順序必須跟 GenerateShaders() 裡那六行一字不差
++    static const csmChar* vertPaths[6] = {
++        "FrameworkShaders/VertShaderSrcBlend.vert",
++        "FrameworkShaders/VertShaderSrcMaskedBlend.vert",
++        "FrameworkShaders/VertShaderSrcMaskedBlend.vert",
++        "FrameworkShaders/VertShaderSrcBlend.vert",
++        "FrameworkShaders/VertShaderSrcMaskedBlend.vert",
++        "FrameworkShaders/VertShaderSrcMaskedBlend.vert",
++    };
++    static const csmChar* fragPaths[6] = {
++        "FrameworkShaders/FragShaderSrcBlend.frag",
++        "FrameworkShaders/FragShaderSrcMaskBlend.frag",
++        "FrameworkShaders/FragShaderSrcMaskInvertedBlend.frag",
++        "FrameworkShaders/FragShaderSrcPremultipliedAlphaBlend.frag",
++        "FrameworkShaders/FragShaderSrcMaskPremultipliedAlphaBlend.frag",
++        "FrameworkShaders/FragShaderSrcMaskInvertedPremultipliedAlphaBlend.frag",
++    };
++
++    _shaderSets[shaderName]->ShaderProgram =
++        LoadShaderProgramFromFile(vertPaths[variant], fragPaths[variant], colorBlendMode, alphaBlendMode);
++    // MaskType_None..MaskType_MaskedInvertedPremultipliedAlpha は 0..5 で variant と同順
++    SetShaderSet(*_shaderSets[shaderName], static_cast<MaskType>(variant), true);
++#else
++    static_cast<void>(shaderName);
++#endif
+ }
+ 
+ void CubismShader_OpenGLES2::SetupShaderProgramForDrawable(CubismRenderer_OpenGLES2* renderer, const CubismModel& model, const csmInt32 index)
+@@ -557,6 +621,7 @@ void CubismShader_OpenGLES2::SetupShaderProgramForDrawable(CubismRenderer_OpenGL
+ 
+     // シェーダーセット
+     const csmInt32 shaderNameBegin = GetShaderNamesBegin(model.GetDrawableBlendModeType(index));
++    EnsureBlendShaderSet(shaderNameBegin + offset);  // [live2d_mate patch] 遅延生成
+     CubismShaderSet* shaderSet = _shaderSets[shaderNameBegin + offset];
+     csmBool isBlendMode = false;
+     GLuint blendTexture = 0;
+@@ -746,6 +811,7 @@ void CubismShader_OpenGLES2::SetupShaderProgramForOffscreen(CubismRenderer_OpenG
+ 
+     // シェーダーセット
+     const csmInt32 shaderNameBegin = GetShaderNamesBegin(model.GetOffscreenBlendModeType(offscreenIndex));
++    EnsureBlendShaderSet(shaderNameBegin + offset);  // [live2d_mate patch] 遅延生成
+     CubismShaderSet* shaderSet = _shaderSets[shaderNameBegin + offset];
+     csmBool isBlendMode = false;
+     GLuint blendTexture = 0;
+diff --git a/src/Rendering/OpenGL/CubismShader_OpenGLES2.hpp b/src/Rendering/OpenGL/CubismShader_OpenGLES2.hpp
+index 635512b..d63cce7 100644
+--- a/src/Rendering/OpenGL/CubismShader_OpenGLES2.hpp
++++ b/src/Rendering/OpenGL/CubismShader_OpenGLES2.hpp
+@@ -205,6 +205,14 @@ private:
+      */
+     static csmInt32 GetShaderNamesBegin(const csmBlendMode blendMode);
+ 
++    /**
++     * @brief   [live2d_mate patch] 指定索引的混合模式 shader 若尚未產生，就地補上。
++     *          非混合模式的索引、以及 Android ES2（維持原本的預先產生）不做事。
++     *
++     * @param[in]   shaderName  ->  _shaderSets 的索引
++     */
++    void EnsureBlendShaderSet(const csmInt32 shaderName);
++
+     /**
+      * @brief   privateなコンストラクタ
+      */

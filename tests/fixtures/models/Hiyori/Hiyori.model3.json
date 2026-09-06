@@ -1,0 +1,15 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "Hiyori.moc3",
+    "Textures": ["Hiyori.2048/texture_00.png"],
+    "Motions": {
+      "Idle": [{ "File": "motions/idle_01.motion3.json" }, { "File": "motions/idle_02.motion3.json" }],
+      "TapBody": [{ "File": "motions/tap_01.motion3.json" }]
+    },
+    "Expressions": [
+      { "Name": "Smile", "File": "exp/smile.exp3.json" },
+      { "Name": "Angry", "File": "exp/angry.exp3.json" }
+    ]
+  }
+}

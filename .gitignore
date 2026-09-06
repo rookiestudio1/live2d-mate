@@ -1,0 +1,17 @@
+# 建置產物
+build/
+build-*/
+
+# Cubism Core 為 Live2D 專有授權，不得進 repo（見 docs/CUBISM_CORE_SETUP.md）
+third_party/CubismCore/
+
+# Qt 的 LGPL 授權全文，由 release.yml 在 configure 之前從 Qt 安裝樹複製進來，
+# 再由 install() 規則帶進 zip 與安裝檔。屬於建置產物，不進 repo。
+third_party/qt-licenses/
+
+# IDE
+.claude/
+.vs/
+.vscode/
+.qtcreator/
+CMakeLists.txt.user

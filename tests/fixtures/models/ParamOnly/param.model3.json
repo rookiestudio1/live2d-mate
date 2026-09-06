@@ -1,0 +1,12 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "param.moc3",
+    "Textures": ["param.4096/texture_00.png"],
+    "Physics": "param.physics3.json",
+    "DisplayInfo": "param.cdi3.json",
+    "Motions": {
+      "Idle": [{ "File": "walk.motion3.json" }]
+    }
+  }
+}

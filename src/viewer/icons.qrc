@@ -1,0 +1,13 @@
+<RCC>
+  <qresource prefix="/viewer">
+    <file>icons/open_file.svg</file>
+    <file>icons/set_as_pet.svg</file>
+    <file>icons/stop.svg</file>
+    <file>icons/dock.svg</file>
+    <file>icons/undock.svg</file>
+    <file>icons/fullscreen.svg</file>
+    <file>icons/exit_fullscreen.svg</file>
+    <file>icons/loop.svg</file>
+    <file>icons/no_loop.svg</file>
+  </qresource>
+</RCC>

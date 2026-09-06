@@ -1,0 +1,9 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "Upper.moc3",
+    "Textures": ["Upper.2048/texture_00.png"],
+    "Motions": { "Idle": [{ "File": "motions/idle_01.motion3.json" }] },
+    "Expressions": [{ "Name": "Smile", "File": "exp/smile.exp3.json" }]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "Version": 3,
+  "Meta": { "PhysicsSettingCount": 1, "TotalInputCount": 2, "TotalOutputCount": 2 },
+  "PhysicsSettings": [
+    {
+      "Id": "PhysicsSetting1",
+      "Input": [
+        { "Source": { "Target": "Parameter", "Id": "ParamAngleX" }, "Weight": 60, "Type": "X", "Reflect": false },
+        { "Source": { "Target": "Parameter", "Id": "expression11" }, "Weight": 10, "Type": "X", "Reflect": false }
+      ],
+      "Output": [
+        { "Destination": { "Target": "Parameter", "Id": "Param6" }, "VertexIndex": 1, "Scale": 15, "Weight": 100, "Type": "Angle", "Reflect": false },
+        { "Destination": { "Target": "Parameter", "Id": "Param26" }, "VertexIndex": 1, "Scale": 15, "Weight": 100, "Type": "Angle", "Reflect": false }
+      ]
+    }
+  ]
+}

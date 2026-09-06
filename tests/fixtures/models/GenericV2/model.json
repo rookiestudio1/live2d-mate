@@ -1,0 +1,9 @@
+{
+  "type": "Live2D Model Setting",
+  "model": "generic.moc",
+  "textures": ["texture_00.png"],
+  "motions": {
+    "idle": [{ "file": "motions/idle.mtn" }]
+  },
+  "expressions": [{ "name": "f01", "file": "f01.exp.json" }]
+}

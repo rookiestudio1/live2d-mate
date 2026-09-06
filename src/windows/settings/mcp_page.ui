@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>McpPage</class>
+ <widget class="QWidget" name="McpPage">
+  <layout class="QVBoxLayout" name="outerLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="frameShape">
+      <enum>QFrame::Shape::NoFrame</enum>
+     </property>
+     <property name="horizontalScrollBarPolicy">
+      <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+     </property>
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollContent">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>880</width>
+        <height>1200</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="rootLayout">
+       <property name="spacing">
+        <number>10</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="hint">
+         <property name="text">
+          <string>mcp.hint</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="listenGroup">
+         <property name="title">
+          <string>mcp.section.listen</string>
+         </property>
+         <layout class="QGridLayout" name="listenLayout">
+          <property name="horizontalSpacing">
+           <number>12</number>
+          </property>
+          <item row="0" column="0" colspan="3">
+           <widget class="QCheckBox" name="enabled">
+            <property name="text">
+             <string>mcp.field.enabled</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="hostLabel">
+            <property name="text">
+             <string>mcp.field.host</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1" colspan="2">
+           <widget class="QComboBox" name="host">
+            <property name="editable">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="portLabel">
+            <property name="text">
+             <string>mcp.field.port</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="port">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="tokenLabel">
+            <property name="text">
+             <string>mcp.field.token</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QLineEdit" name="token">
+            <property name="echoMode">
+             <enum>QLineEdit::Password</enum>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="2">
+           <layout class="QHBoxLayout" name="tokenButtons">
+            <item>
+             <widget class="QCheckBox" name="showToken">
+              <property name="text">
+               <string>mcp.token.show</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="generate">
+              <property name="text">
+               <string>mcp.token.generate</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="4" column="0" colspan="3">
+           <widget class="QLabel" name="warning">
+            <property name="text">
+             <string/>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0" colspan="3">
+           <widget class="QLabel" name="applyHint">
+            <property name="text">
+             <string>settings.mcp.applyHint</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="6" column="0" colspan="3">
+           <layout class="QHBoxLayout" name="applyRow">
+            <item>
+             <widget class="QLabel" name="status">
+              <property name="text">
+               <string/>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="apply">
+              <property name="text">
+               <string>mcp.apply</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="speechGroup">
+         <property name="title">
+          <string>mcp.section.speech</string>
+         </property>
+         <layout class="QVBoxLayout" name="speechLayout">
+          <item>
+           <widget class="QCheckBox" name="talkative">
+            <property name="text">
+             <string>settings.mcp.talkative</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="notifyOnComplete">
+            <property name="text">
+             <string>settings.mcp.notifyOnComplete</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="speakNoWait">
+            <property name="text">
+             <string>settings.mcp.speakNoWait</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="announceSteps">
+            <property name="text">
+             <string>settings.mcp.announceSteps</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="speechHint">
+            <property name="text">
+             <string>settings.mcp.speechHint</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="clientsGroup">
+         <property name="title">
+          <string>mcp.section.clients</string>
+         </property>
+         <layout class="QVBoxLayout" name="clientsLayout"/>
+        </widget>
+       </item>
+       <item>
+        <spacer name="tailSpacer">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

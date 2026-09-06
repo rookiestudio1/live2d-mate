@@ -1,0 +1,12 @@
+<RCC>
+  <qresource prefix="/icons">
+    <file>icon.png</file>
+    <file>app.ico</file>
+    <file>splash.png</file>
+    <file>splash@2x.png</file>
+    <file>tray.png</file>
+    <file>tray@2x.png</file>
+    <file>trayTemplate.png</file>
+    <file>trayTemplate@2x.png</file>
+  </qresource>
+</RCC>

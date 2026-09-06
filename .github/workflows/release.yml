@@ -1,0 +1,275 @@
+# 打 tag（v*）就建出 Windows 版並發成 GitHub Release。
+#
+# 產出三個資產：NSIS 安裝檔（`-setup.exe`）、便攜版 zip、完整 pdb。
+# 前兩個是**同一個程式的兩種包裝**，不是兩個版本 —— 內容都由 CMakeLists.txt 的
+# install() 規則決定，安裝檔只是多一層 NSIS。所以要出貨的東西一律加成
+# install() 規則，不要在 cmake --install 之後才補進 dist/：那樣補的東西
+# 只會進 zip，安裝檔裡靜靜地少一份。
+#
+# 跟 tests.yml 最大的差別：這裡要建主程式，所以**需要 Live2D Cubism Core**。
+# Core 是閉源的，不進 repo、也不該塞進 secret 當附件散布（那等於散布 Live2D 的
+# 專有二進位）。作法是在 repo 的 Settings → Secrets and variables → Actions →
+# Variables 加一個 CUBISM_SDK_URL，指向官方 Cubism SDK for Native 5-r.5 的
+# 下載位址；CI 當場抓、用完就丟。**下載即代表同意 Live2D 的授權條款**，
+# 那份同意由設定這個變數的人承擔。沒設就直接失敗並說明原因。
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  QT_VERSION: 6.8.3
+  CUBISM_VERSION: 5-r.5
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write # gh release create 需要
+    steps:
+      - uses: actions/checkout@v4
+
+      # 版本號只在這裡算一次，後面全部讀 env：
+      #   REF_NAME    —— 資產檔名用的識別（tag 原樣，例如 v1.2.0；手動觸發是 dev）
+      #   PKG_VERSION —— 安裝檔顯示的版本。去掉開頭的 v 純粹是因為「應用程式與
+      #                  功能」的版本欄寫 v1.2.0 很怪；格式**沒有**限制，
+      #                  CPack 的 NSIS 樣板只會把它原樣寫進 DisplayVersion
+      # 原本 Zip 與 Package debug symbols 各算一次同樣的東西，多一個地方就多一個
+      # 忘了改的機會 —— 安裝檔加進來之後變成三個。
+      - name: Resolve version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like "refs/tags/*") {
+            $name = $env:GITHUB_REF_NAME
+            $version = $name -replace '^v', ''
+          } else {
+            $name = "dev"
+            $version = "0.0.0-dev"
+          }
+          "REF_NAME=$name"       | Out-File -Append $env:GITHUB_ENV
+          "PKG_VERSION=$version" | Out-File -Append $env:GITHUB_ENV
+          Write-Host "資產名稱 $name / 安裝檔版本 $version"
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          # 完整建置要 WebSockets（Edge TTS 走 wss），qtbase 沒附。
+          # qtimageformats 是 **WebP 貼圖的模型**要的：貼圖解碼走 QImage，而 qwebp
+          # 外掛在這個模組裡，少了它那種模型會靜靜地變成一隻全透明的角色
+          #（整條失敗鏈寫在 src/core/texture_format.h）。windeployqt 會把整個
+          # imageformats 目錄帶進安裝檔 —— CMakeLists 沒有 qt_import_plugins 之類的過濾。
+          modules: qtwebsockets qtimageformats
+          cache: true
+
+      - name: Fetch Live2D Cubism Core
+        shell: pwsh
+        env:
+          CUBISM_SDK_URL: ${{ vars.CUBISM_SDK_URL }}
+        run: |
+          if (-not $env:CUBISM_SDK_URL) {
+            Write-Host "::error::未設定 repository variable CUBISM_SDK_URL。"
+            Write-Host "::error::請到 Settings -> Secrets and variables -> Actions -> Variables 新增，"
+            Write-Host "::error::值為官方 Cubism SDK for Native $env:CUBISM_VERSION 的下載位址（見 docs/CUBISM_CORE_SETUP.md）。"
+            exit 1
+          }
+          New-Item -ItemType Directory -Force sdk | Out-Null
+          Invoke-WebRequest -Uri $env:CUBISM_SDK_URL -OutFile sdk/cubism-sdk.zip
+          Expand-Archive -Path sdk/cubism-sdk.zip -DestinationPath sdk/extracted
+          # 壓縮包最外層通常多包一層 CubismSdkForNative-<版本>/，所以用找的而不是寫死路徑
+          $core = Get-ChildItem -Path sdk/extracted -Recurse -Directory -Filter Core |
+                  Select-Object -First 1
+          if (-not $core) { throw "解壓後找不到 Core/ 目錄，CUBISM_SDK_URL 指的可能不是 SDK 壓縮包" }
+
+          $dst = "third_party/CubismCore"
+          New-Item -ItemType Directory -Force "$dst/include" | Out-Null
+          New-Item -ItemType Directory -Force "$dst/lib/windows/x86_64/143" | Out-Null
+          Copy-Item "$($core.FullName)/include/Live2DCubismCore.h" "$dst/include/" -Force
+          Copy-Item "$($core.FullName)/lib/windows/x86_64/143/*.lib" `
+                    "$dst/lib/windows/x86_64/143/" -Force
+          # 授權全文：打包時會被 install 規則帶進 zip（見 CMakeLists.txt 的安裝段）
+          Copy-Item "$($core.FullName)/LICENSE.md" "$dst/LICENSE.md" -Force
+          Get-ChildItem -Recurse $dst | Select-Object FullName
+
+      # Qt 是 LGPL v3，散布 binary 要附授權全文。Qt 的安裝版面各版不同，
+      # 找得到就複製，找不到就出警告而不是讓整個發布失敗 —— 但**發布前要自己確認**
+      # 產出的包裡真的有那幾份（見 THIRD_PARTY_NOTICES.md 的 Qt 段）。
+      #
+      # **這一步必須排在 Configure 之前**，而且目的地是原始碼樹而不是 dist/：
+      # NSIS 安裝檔是 cpack 自己重跑一遍 install 規則產生的，事後補進 dist/ 的
+      # 檔案它看不到。改成由 CMakeLists.txt 的 install(DIRECTORY) 規則帶走，
+      # zip 與安裝檔才會拿到同一份東西。那條規則是 EXISTS 判斷的，所以這裡
+      # 必須先放好檔案 configure 才看得到。
+      - name: Collect Qt license texts
+        shell: pwsh
+        run: |
+          $dst = "third_party/qt-licenses"
+          # 先清掉：Copy-Item -Recurse 在目的地**已存在**時是「複製到裡面」而不是
+          # 「取代」，重跑一次就會變成 qt-licenses/LICENSES/…，安裝包裡跟著多一層，
+          # 而且完全不會有訊息。乾淨的 runner 碰不到，重用工作區的才會。
+          if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
+          $found = $false
+          foreach ($p in @("$env:QT_ROOT_DIR/LICENSES", "$env:QT_ROOT_DIR/../../Licenses")) {
+            if (Test-Path $p) {
+              Copy-Item $p $dst -Recurse -Force
+              $found = $true
+              break
+            }
+          }
+          if (-not $found) {
+            Write-Host "::warning::在 Qt 安裝目錄裡找不到授權文字，產出的包不會有 LGPL 全文。"
+            Write-Host "::warning::發布前請自行補上 LGPLv3 與 GPLv3 的全文。"
+          }
+
+      # NSIS 在 GitHub 的 windows image 裡本來就有，但 image 的內容是會變的，
+      # 而 cpack 找不到 makensis 時只會丟一句「Cannot initialize the generator NSIS」，
+      # 從那句話完全看不出是環境問題。這裡先明確檢查，真的缺了才臨時裝。
+      - name: Ensure NSIS
+        shell: pwsh
+        run: |
+          $nsis = "C:\Program Files (x86)\NSIS"
+          if (-not (Test-Path "$nsis\makensis.exe")) {
+            Write-Host "image 裡沒有 NSIS，改用 choco 安裝"
+            choco install nsis --no-progress -y
+            # 不檢查的話，下面那句 makensis 會以 CommandNotFoundException 收場，
+            # log 最上面卻是 choco 的堆疊 —— 真正的原因（image 沒有 NSIS 了）
+            # 反而看不出來
+            if ($LASTEXITCODE -ne 0) { throw "choco install nsis 失敗" }
+          }
+          Add-Content $env:GITHUB_PATH $nsis
+          & "$nsis\makensis.exe" /VERSION
+
+      # L2M_BUILD_VIEWER 維持預設（跟著 L2M_BUILD_APP＝ON）：Viewer 現在會一起
+      # 出貨，安裝檔多一個「Live2D Viewer」的開始選單捷徑，zip 裡也多一支執行檔。
+      # 關掉的話兩邊都會靜靜地少掉它。
+      - name: Configure
+        run: >
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+          -DL2M_BUILD_TESTS=OFF
+          -DL2M_PACKAGE_VERSION=${{ env.PKG_VERSION }}
+
+      - name: Build
+        run: cmake --build build --config RelWithDebInfo
+
+      # install 規則是平放版面：exe 旁邊直接是 i18n/、FrameworkShaders/、Qt DLL
+      # 與授權文件。理由寫在 CMakeLists.txt 的安裝段註解裡。
+      - name: Install into package layout
+        run: cmake --install build --config RelWithDebInfo --prefix dist/live2d_mate
+
+      - name: Show package contents
+        shell: pwsh
+        run: Get-ChildItem -Recurse dist/live2d_mate | Select-Object FullName
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/live2d_mate/* `
+                           -DestinationPath "live2d_mate-$env:REF_NAME-win64.zip"
+          "ASSET=live2d_mate-$env:REF_NAME-win64.zip" | Out-File -Append $env:GITHUB_ENV
+
+      # NSIS 安裝檔。內容不是壓上面那個 dist/，而是 cpack 自己再跑一遍 install
+      # 規則（含 windeployqt）產生的 —— 所以這一步會再花一次部署的時間，
+      # 換來的是「安裝檔的內容一定等於 install() 規則說的內容」，不會因為有人
+      # 在 cmake --install 之後多補了一個檔案就悄悄分岔。
+      #
+      # 檔名在這裡覆蓋而不是交給 CMake：資產名要跟 zip 一致用 tag 原樣
+      # （v1.2.0），但安裝檔顯示的版本要純數字，兩者本來就不同（見 Resolve version）。
+      - name: Build NSIS installer
+        shell: pwsh
+        run: |
+          $setup = "live2d_mate-$env:REF_NAME-win64-setup"
+          cpack --config build/CPackConfig.cmake -C RelWithDebInfo -G NSIS `
+                -B build/package -D CPACK_PACKAGE_FILE_NAME="$setup"
+          if ($LASTEXITCODE -ne 0) { throw "cpack 產生 NSIS 安裝檔失敗" }
+          # 用找的而不是寫死路徑：多組態產生器日後若改成把產出放進 <config>/
+          # 子目錄，寫死的那一行會在 Move-Item 才炸，而且看起來像是 cpack 沒跑
+          $built = Get-ChildItem -Path build/package -Recurse -Filter "$setup.exe" |
+                   Select-Object -First 1
+          if (-not $built) { throw "cpack 回報成功，卻找不到 $setup.exe" }
+          Move-Item $built.FullName "$setup.exe" -Force
+          "SETUP_ASSET=$setup.exe" | Out-File -Append $env:GITHUB_ENV
+
+      # 完整 pdb 實測 165.18 MB（精簡版 14.23 MB，比例約 1/11.6），太肥不能塞進主 zip；但少了它 crash 報告就只有函式名
+      # 沒有行號。掛成獨立資產：crash 檔記了 RVA 與 PDB GUID/age，抓這一包下來就能用
+      # llvm-symbolizer / WinDbg 精確還原到 file:line（見設計文件 §9）。
+      # 出貨 zip 裡的是 /PDBSTRIPPED 產的精簡版（已由 install 規則改名成 live2d_mate.pdb），
+      # 這裡要的是建置樹裡的**完整**那一份，所以要排除 stripped。
+      - name: Package debug symbols
+        shell: pwsh
+        run: |
+          # 多組態產生器的輸出在 build/RelWithDebInfo/；用找的而不是寫死，
+          # 免得日後換產生器就靜靜壓出一包空的。
+          #
+          # **必須排除 cpack 的暫存區**（build/package/_CPack_Packages/…）：
+          # 那底下有一份 install 規則裝進去的**精簡** pdb，而它已經被
+          # RENAME 成 live2d_mate.pdb（見 CMakeLists.txt 的 install 段），
+          # 所以檔名與路徑都不含 "stripped"，上面那個條件擋不住它。
+          # 撿錯的後果特別陰險：/PDBSTRIPPED 會保留 PDB 的 GUID/age，
+          # WinDbg 與 llvm-symbolizer 照樣認得，只是永遠解不出行號 ——
+          # 而這包資產存在的唯一理由就是行號。
+          $pdb = Get-ChildItem -Path build -Recurse -Filter live2d_mate.pdb |
+                 Where-Object { $_.FullName -notlike "*stripped*" -and
+                                $_.FullName -notlike "*_CPack_Packages*" } |
+                 Select-Object -First 1
+          if (-not $pdb) { throw "建置樹裡找不到完整的 live2d_mate.pdb" }
+          Compress-Archive -Path $pdb.FullName `
+                           -DestinationPath "live2d_mate-$env:REF_NAME-pdb.zip"
+          "PDB_ASSET=live2d_mate-$env:REF_NAME-pdb.zip" | Out-File -Append $env:GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: live2d_mate-win64
+          path: |
+            ${{ env.ASSET }}
+            ${{ env.SETUP_ASSET }}
+            ${{ env.PDB_ASSET }}
+
+      # 只有 tag 才真的開 release；workflow_dispatch 只留上面那個 artifact
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = @'
+          ### Which download?
+
+          | File | Use it when |
+          |---|---|
+          | `...-win64-setup.exe` | You want the usual thing: an installer that puts Live2D Mate in Program Files and adds Start Menu shortcuts (a desktop icon is an optional checkbox). Needs administrator rights. |
+          | `...-win64.zip` | You want a portable copy: unzip it anywhere (a USB stick works), run `live2d_mate.exe`, no administrator rights and nothing written to the registry. |
+
+          Both carry the same two programs: the desktop mate itself, and **Live2D
+          Viewer** (`live2d_viewer.exe`) — a single-window inspector that opens a
+          `.model3.json` or a zipped model and lets you preview every motion and
+          expression it has. The installer puts both in the Start Menu.
+
+          Settings, models and logs always live in `%APPDATA%\live2d_mate\`, so the
+          installed and the portable copy are interchangeable and uninstalling never
+          touches your data.
+
+          Neither is code-signed yet, so SmartScreen will warn on first run.
+
+          ### Debug symbols
+
+          `live2d_mate-<tag>-pdb.zip` contains the full PDB for this build. You only
+          need it to turn the `module+0xRVA` lines of a crash report into exact source
+          locations; the shipped archive already resolves function names on its own.
+
+          ### Licensing
+
+          The **source code** of Live2D Mate is MIT licensed.
+
+          This **binary** is not. It statically links Live2D Cubism Core, which is
+          proprietary software owned by Live2D Inc., and dynamically links Qt 6 under
+          the LGPL v3. See `LICENSE`, `THIRD_PARTY_NOTICES.md` and the
+          `LICENSE.*.md` files inside the archive for the full terms.
+          '@
+          gh release create $env:GITHUB_REF_NAME `
+            $env:SETUP_ASSET $env:ASSET $env:PDB_ASSET `
+            --title $env:GITHUB_REF_NAME --notes $notes

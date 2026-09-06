@@ -1,0 +1,86 @@
+# 單元測試 CI。
+#
+# 這裡刻意**不建主程式**（-DL2M_BUILD_APP=OFF）。
+# 理由是 Live2D Cubism Core 閉源、不進 repo，CI 的乾淨環境本來就拿不到它，
+# 而 63 支測試全部只連 l2m_core、一行 Cubism 都沒用到（見 CMakeLists.txt 的
+# l2m_add_test），所以 PR 的回饋迴圈根本不需要那份 SDK。
+# 完整建置與打包在 release.yml，那邊才需要 Core。
+name: tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# 同一個分支連推兩次時，把還在跑的前一輪取消掉
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 專案開發用 6.8.3 與 6.11.2 兩版，CI 釘在 LTS 這版；換版改這一處即可。
+  QT_VERSION: 6.8.3
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          # L2M_BUILD_APP=OFF 只要 qtbase（Core / Network / Test），
+          # 不必額外裝 qtwebsockets —— 那是 l2m_media 的相依。
+          cache: true
+
+      # 用 Visual Studio 產生器而不是 Ninja：windows-latest 一定有 MSVC 2022，
+      # 不必再拉 ninja 與 vcvars 的 action 進來。慢一點，但少兩個會壞的環節。
+      - name: Configure
+        run: >
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+          -DL2M_BUILD_APP=OFF
+          -DL2M_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  # Linux 支援的第一道防線：l2m_core 與 63 支測試在 GCC 上建得過、跑得綠。
+  # 平台層（src/platform/）與主程式不在此建置範圍，所以這個 job 不代表
+  # 完整的 Linux 支援，只驗證「決策邏輯放 core」那七成程式碼。
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: linux
+          target: desktop
+          # 6.7 起 Linux 的 arch 名稱從 gcc_64 改為 linux_gcc_64
+          arch: linux_gcc_64
+          cache: true
+
+      # ubuntu-latest 自帶 gcc 與 make，用預設產生器即可；
+      # 單一組態產生器要在 configure 時就給 build type。
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DL2M_BUILD_APP=OFF
+          -DL2M_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure

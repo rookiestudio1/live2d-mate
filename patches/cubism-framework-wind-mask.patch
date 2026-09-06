@@ -1,0 +1,112 @@
+CubismNativeFramework 5-r.5：Wind に「設定ごとのマスク」を足す（Options.WindMask）
+==============================================================================
+
+症狀：環境風（本專案的 ambient wind，持續吹的水平風力）一開，整個身體
+搖晃的幅度比頭髮還大，看起來像站不穩，而不是頭髮在飄。
+實測「Gan Yu_LordHut_XJY_booth」是上下大幅擺動，「椿」「镜流」「长离」則是左右。
+
+根因：CubismPhysics 的 Options.Wind 是全域選項，所有 PhysicsSetting 一起吃。
+但模型裡有兩種本質不同的 rig：
+  * 「鏈」—— 頭髮、衣襬，吹了會飄，輸出倍率約 1（也有作者寫 30 的）。
+  * 「角度跟隨器」—— 把 ParamAngleX/Y/Z 轉成 ParamBodyAngleX/Y/Z 的擺錘，
+    輸出倍率動輒數十倍。持續風力對它只是把它推到新的平衡角再放大幾十倍
+    寫進身體參數 —— 這就是「身體比頭髮搖更大」。
+
+第一版（cubism-framework-wind-min-vertices.patch）用粒子數當判別：
+「粒子數 < 3 ＝ 單節擺錘 ＝ 不是會飄的鏈」。那條規則擋得住大多數，但擋不住
+把跟隨器做成 3~5 節的模型 —— 實測手邊 30 隻裡有 4 隻（Gan Yu 的
+PhysicsSetting2／3 各 5 粒子、椿 15、镜流 14、长离 11 各 3 粒子），
+而它們的 Output 一路寫進 ParamBodyAngleX/Y/Z。
+所以判別改成「粒子數 ＋ 輸出目標」兩條一起看，而那是**呼叫端**才知道的事
+（要讀 physics3.json 並比對 Cubism 標準參數 id），不該塞進 Framework。
+
+修法：Options 改成吃一份呼叫端算好的遮罩（WindMask／WindMaskCount，
+NULL ＝ 全部吃風，維持原行為）。Evaluate 與 Stabilization 兩處把 Wind 餵給
+UpdateParticles* 之前，遮罩為 0 的 setting 改餵零向量。
+決策邏輯因此整個回到 core/wind_targets.h（純函式、可測），Framework 這邊
+只剩「照著遮罩送或不送」一句話。
+
+遮罩的記憶體由呼叫端持有（本專案是 ModelController::windMask_，與 _physics
+同生共死，且每幀重新指派一次），SetOptions() 只存指標不複製 ——
+Options 是每幀 GetOptions／SetOptions 來回複製的結構，放 csmVector 等於每幀
+兩次配置；而模型實測有 58 個 PhysicsSetting，位元遮罩（csmUint64）也不夠用。
+
+套用方式見 cmake/FetchCubismFramework.cmake，每次 configure 會自動確認。
+
+授權：本檔是對 CubismNativeFramework 5-r.5 的 unified diff，context 行與被移除的行
+就是 Live2D 的原始碼，所以**這一份不適用本專案的 MIT 授權**，而是跟上游一樣受
+Live2D Open Software License 規範（見 THIRD_PARTY_NOTICES.md 第 1 節）：
+https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html
+
+diff --git a/src/Physics/CubismPhysics.cpp b/src/Physics/CubismPhysics.cpp
+index 5cb4424..8b76fcd 100644
+--- a/src/Physics/CubismPhysics.cpp
++++ b/src/Physics/CubismPhysics.cpp
+@@ -448,6 +448,8 @@ CubismPhysics::CubismPhysics()
+     _options.Gravity.X = 0;
+     _options.Wind.X = 0;
+     _options.Wind.Y = 0;
++    _options.WindMask = NULL;
++    _options.WindMaskCount = 0;
+     _currentRemainTime = 0.0f;
+ }
+ 
+@@ -505,6 +507,8 @@ void CubismPhysics::Reset()
+     _options.Gravity.X = 0.0f;
+     _options.Wind.X = 0.0f;
+     _options.Wind.Y = 0.0f;
++    _options.WindMask = NULL;
++    _options.WindMaskCount = 0;
+ 
+     _physicsRig->Gravity.X = 0.0f;
+     _physicsRig->Gravity.Y = 0.0f;
+@@ -750,12 +754,15 @@ void CubismPhysics::Stabilization(CubismModel* model)
+         totalTranslation.Y = (totalTranslation.X * CubismMath::SinF(radAngle) + totalTranslation.Y * CubismMath::CosF(radAngle));
+ 
+         // Calculate particles position.
++        // [live2d_mate] 風を当てない設定（体の角度追従リグ）には零ベクトルを渡す。
+         UpdateParticlesForStabilization(
+             currentParticles,
+             currentSetting->ParticleCount,
+             totalTranslation,
+             totalAngle,
+-            _options.Wind,
++            (_options.WindMask && settingIndex < _options.WindMaskCount && !_options.WindMask[settingIndex])
++                ? CubismVector2(0.0f, 0.0f)
++                : _options.Wind,
+             MovementThreshold * currentSetting->NormalizationPosition.Maximum
+         );
+ 
+@@ -960,12 +967,15 @@ void CubismPhysics::Evaluate(CubismModel* model, csmFloat32 deltaTimeSeconds)
+             totalTranslation.Y = (totalTranslation.X * CubismMath::SinF(radAngle) + totalTranslation.Y * CubismMath::CosF(radAngle));
+ 
+             // Calculate particles position.
++            // [live2d_mate] 風を当てない設定（体の角度追従リグ）には零ベクトルを渡す。
+             UpdateParticles(
+                 currentParticles,
+                 currentSetting->ParticleCount,
+                 totalTranslation,
+                 totalAngle,
+-                _options.Wind,
++                (_options.WindMask && settingIndex < _options.WindMaskCount && !_options.WindMask[settingIndex])
++                    ? CubismVector2(0.0f, 0.0f)
++                    : _options.Wind,
+                 MovementThreshold * currentSetting->NormalizationPosition.Maximum,
+                 physicsDeltaTime,
+                 AirResistance
+diff --git a/src/Physics/CubismPhysics.hpp b/src/Physics/CubismPhysics.hpp
+index bba58a8..97f117f 100644
+--- a/src/Physics/CubismPhysics.hpp
++++ b/src/Physics/CubismPhysics.hpp
+@@ -32,6 +32,11 @@ public:
+     {
+         CubismVector2 Gravity; ///< 重力方向
+         CubismVector2 Wind; ///< 風の方向
++        // [live2d_mate] 設定ごとに風を当てるかのマスク。要素数は PhysicsSetting 数。
++        // NULL = 全設定に適用（オリジナルの挙動）。0 の設定には風を送らない。
++        // 実体の所有者は呼び出し側。SetOptions() はポインタをそのまま保持する。
++        const csmUint8* WindMask;
++        csmInt32 WindMaskCount;
+     };
+ 
+     /**

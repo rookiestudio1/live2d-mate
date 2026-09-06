@@ -1,0 +1,9 @@
+{
+  "model": "legacy.moc",
+  "textures": ["legacy.1024/texture_00.png"],
+  "motions": {
+    "idle": [{ "file": "motions/idle.mtn" }],
+    "tap_body": [{ "file": "motions/tap.mtn" }, { "file": "motions/tap2.mtn" }]
+  },
+  "expressions": [{ "name": "f01", "file": "expressions/f01.exp.json" }]
+}

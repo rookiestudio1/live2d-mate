@@ -1,0 +1,6 @@
+{
+  "model": "upper.moc",
+  "textures": ["upper.1024/texture_00.png"],
+  "motions": { "idle": [{ "file": "motions/idle.mtn" }] },
+  "expressions": [{ "name": "f01", "file": "expressions/f01.exp.json" }]
+}

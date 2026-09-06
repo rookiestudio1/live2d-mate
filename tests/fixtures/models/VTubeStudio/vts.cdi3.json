@@ -1,0 +1,9 @@
+{
+  "Version": 3,
+  "Parameters": [
+    { "Id": "expression1", "GroupId": "ParamGroup", "Name": "偷笑" },
+    { "Id": "ParamAngleX", "GroupId": "", "Name": "角度 X" }
+  ],
+  "ParameterGroups": [{ "Id": "ParamGroup", "GroupId": "", "Name": "表情" }],
+  "Parts": []
+}

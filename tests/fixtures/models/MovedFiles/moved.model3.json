@@ -1,0 +1,12 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "moved.moc3",
+    "Textures": ["moved.4096/texture_00.png"],
+    "Expressions": [
+      { "Name": "微笑", "File": "smile.exp3.json" },
+      { "Name": "生氣", "File": "angry.exp3.json" },
+      { "Name": "根本不存在", "File": "ghost.exp3.json" }
+    ]
+  }
+}

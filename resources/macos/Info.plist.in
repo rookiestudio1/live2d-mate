@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  自訂的 bundle Info.plist 樣板，取代 CMake/Qt 的預設樣板。
+  存在的唯一理由是 LSUIElement —— 預設樣板沒有這個鍵，而它沒辦法從
+  set_target_properties 設進去（MACOSX_BUNDLE_* 只認樣板裡有的變數）。
+  其餘欄位刻意與 Qt 產生的那份保持一致。
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+
+	<key>CFBundleName</key>
+	<string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
+	<key>CFBundleIdentifier</key>
+	<string>${MACOSX_BUNDLE_GUI_IDENTIFIER}</string>
+	<key>CFBundleExecutable</key>
+	<string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
+
+	<key>CFBundleVersion</key>
+	<string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
+	<key>CFBundleShortVersionString</key>
+	<string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
+
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleAllowMixedLocalizations</key>
+	<true/>
+
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSSupportsAutomaticGraphicsSwitching</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+
+	<!--
+	  桌寵是「系統匣程式」：全部設定都從選單列圖示走（見 windows/tray.h），
+	  沒有主視窗也沒有選單列選單。不設這個鍵的話 macOS 會給它一個 Dock 圖示
+	  和一整排空的應用程式選單，角色被關掉之後 Dock 上還留著一個點不出東西的圖示。
+	  LSUIElement 讓它變成純選單列 app —— 對應 Windows 版的 Qt::Tool + 不進工作列。
+	-->
+	<key>LSUIElement</key>
+	<true/>
+</dict>
+</plist>

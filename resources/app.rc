@@ -1,0 +1,9 @@
+// exe 本身的圖示（檔案總管、工作列釘選、Alt-Tab 的 fallback）。
+// 這與 QApplication::setWindowIcon 是兩回事：後者只影響已開啟視窗的標題列與
+// 工作列按鈕，執行檔在磁碟上長什麼樣只看這裡。兩邊都要設。
+//
+// 資源名用 IDI_ICON1（Qt 官方 "Setting the Application Icon" 的慣例，不是隨便取的）：
+// QWindowsContext::registerWindowClass 會 LoadImage(hInst, L"IDI_ICON1", …) 拿來當
+// window class 的預設圖示。改成序號 1 的話那支 LoadImage 依名字找不到，
+// 就少了一層 fallback —— 檔案總管兩種都認得，所以沒有理由不用有 fallback 的那個。
+IDI_ICON1 ICON "app.ico"

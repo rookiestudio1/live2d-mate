@@ -1,0 +1,25 @@
+{
+  "Version": 3,
+  "Parameters": [
+    { "Id": "expression1", "GroupId": "ParamGroup", "Name": "哭哭" },
+    { "Id": "expression6", "GroupId": "ParamGroup", "Name": "生氣" },
+    { "Id": "expression11", "GroupId": "ParamGroup", "Name": "換衣服" },
+    { "Id": "Param80", "GroupId": "ParamGroup", "Name": "呲牙表情" },
+    { "Id": "Param91", "GroupId": "ParamGroup", "Name": "瀏海物理補正" },
+    { "Id": "Param26", "GroupId": "ParamGroup5", "Name": "手臂1" },
+    { "Id": "Param6", "GroupId": "ParamGroup3", "Name": "前髮物理1" },
+    { "Id": "Param73", "GroupId": "ParamGroup10", "Name": "手臂揮動" },
+    { "Id": "Param84", "GroupId": "ParamGroup12", "Name": "右腿" },
+    { "Id": "ParamAngleX", "GroupId": "", "Name": "角度 X" },
+    { "Id": "ParamCheek", "GroupId": "", "Name": "臉頰泛紅" },
+    { "Id": "Param99", "GroupId": "ParamGroup10", "Name": "Param99" }
+  ],
+  "ParameterGroups": [
+    { "Id": "ParamGroup", "GroupId": "", "Name": "表情" },
+    { "Id": "ParamGroup3", "GroupId": "", "Name": "頭髮物理" },
+    { "Id": "ParamGroup5", "GroupId": "", "Name": "手臂" },
+    { "Id": "ParamGroup10", "GroupId": "", "Name": "特效" },
+    { "Id": "ParamGroup12", "GroupId": "", "Name": "Folder 1" }
+  ],
+  "Parts": [{ "Id": "Part01", "Name": "頭" }]
+}

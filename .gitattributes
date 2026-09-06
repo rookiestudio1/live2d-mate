@@ -1,0 +1,13 @@
+# patches/ 底下的 patch 是要餵給 git apply 的，行尾必須逐字保留。
+# 目標樹（CubismNativeFramework）自己的 .gitattributes 是「* text=auto eol=lf」，
+# 工作樹一律 LF；這邊若被 core.autocrlf=true 轉成 CRLF，
+# git apply 會對不上內容而失敗 —— 而且只在新 clone 的機器上發作。
+*.patch -text
+
+# Qt Designer 在 Windows 上存檔會寫 CRLF，在別的平台開又寫回 LF，
+# 混進 repo 之後每次有人打開表單就是整檔 diff。釘成 LF。
+*.ui text eol=lf
+
+# 預設角色的內容經 qrc 編進二進位檔，再被種到使用者磁碟上。
+# 不釘的話不同機器 checkout 出來的行尾不一致，種出去的 Default.md 也跟著飄。
+resources/personas/*.md text eol=lf

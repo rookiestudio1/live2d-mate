@@ -1,0 +1,60 @@
+# 這份設定是「repo 現有寫法」的機器可讀版本，不是新規範。
+# 目的只有一個：VSCode 存檔時的 Format Code 產出要跟既有程式碼一致，
+# 存檔才不會把整份沒改過的檔案變成 diff。
+#
+# 除了行寬以外，每一項都是拿整棵 src/ + tests/（305 個 .h/.c/.cpp）做 dry-run 實測
+# 選出來的：clang-format --style=file <檔> 跟原檔比對，數會被改動的行數，愈少代表
+# 愈貼近既有寫法。以下數字量於還沒整棵格式化之前、且行寬固定 100 的條件下：
+#   Google 原樣 …………………………………………… 4966 行
+#   + ContinuationIndentWidth 2 ……………………… 2688 行
+#   + BreakStringLiterals false ………………………… 2635 行
+# 試過但**實測更糟**、所以刻意不放的兩項：
+#   AllowShortCaseLabelsOnASingleLine: true（+48 行；只有 frame_profiler.h 那種
+#     對照表是一行式，多數 switch 是展開的）
+#   LambdaBodyIndentation: OuterScope（+256 行；只有 http_json.cpp 那種
+#     「lambda 被折到下一行當引數」得益，其餘 connect 都是同一行開 lambda）
+# 行寬 200 是後來拍板的（不是實測選的：在既有碼上 100 比 200 少 3346 行 diff），
+# 落差用「整棵樹一次格式化」的那個 commit 一次結清，之後存檔就是零 diff。
+#
+# 版本相容：VSCode 的 C/C++ 擴充自帶 clang-format 22，系統 PATH 上是 12；
+# 這裡只用兩邊都有的選項，實測 20 個檔的輸出逐位元組相同。
+# 新增選項前請先確認 12 也認得 —— clang-format 12 遇到不認得的鍵會整份設定拒收
+# （"unknown key" 直接失敗），到時候就變成兩邊格式不一樣。
+
+Language: Cpp
+BasedOnStyle: Google
+
+# CLAUDE.md 的三條硬性規定
+IndentWidth: 2
+UseTab: Never
+ColumnLimit: 200
+
+# public:／private: 貼齊類別左緣（Google 是 -1）
+AccessModifierOffset: -2
+
+# 建構子初始化列表縮 2，不是 Google 的 4
+ConstructorInitializerIndentWidth: 2
+# 續行（含 braced init list 的元素）也縮 2 —— 全專案只有一種縮排寬度。
+# 這是差最多的一項：不設的話光是 builtin_actions.cpp 的動作表就 500 行 diff。
+ContinuationIndentWidth: 2
+
+# include 順序是手排的，而且順序敏感：<GL/glew.h>、<httplib.h> 必須在 Qt 標頭
+# 之前（見 CLAUDE.md「慣例」），字母排序會把它們沖散 —— 沖散了會編不過。
+SortIncludes: false
+IncludeBlocks: Preserve
+
+# 註解一律不重排。註解全是中文，而 clang-format 在 Windows 上算欄寬是用 UTF-8
+# 位元組數（llvm::sys::locale::columnWidth 在非 Unix 直接回 Text.size()），
+# 一個中文字算 3 欄，重排會把標頭那些區塊註解切成一句話三行。
+ReflowComments: false
+
+# 長字串不自動切。mcp_tool_specs.cpp 的 schema 與提示語是逐句手排的，
+# 交給 clang-format 切會切在 "raw names are " / "usually not..." 這種
+# 半句的位置，讀起來比超出行寬更糟。
+BreakStringLiterals: false
+
+# 指標／參考貼型別（const std::string& value），不要每檔自己推論
+DerivePointerAlignment: false
+PointerAlignment: Left
+
+Standard: c++17

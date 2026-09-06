@@ -1,0 +1,9 @@
+<RCC>
+  <qresource prefix="/personas">
+    <file alias="Default.en.md">personas/Default.en.md</file>
+    <file alias="Default.ja.md">personas/Default.ja.md</file>
+    <file alias="Default.ko.md">personas/Default.ko.md</file>
+    <file alias="Default.zh-CN.md">personas/Default.zh-CN.md</file>
+    <file alias="Default.zh-TW.md">personas/Default.zh-TW.md</file>
+  </qresource>
+</RCC>

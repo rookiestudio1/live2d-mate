@@ -1,0 +1,92 @@
+CubismNativeFramework 5-r.5：motion3.json 的 PartOpacity 曲線真的寫進部件不透明度
+================================================================================
+
+症狀：碧藍航線那批模型播某些動作時會多出一隻手／一隻腳。實測 aidang_2 的
+`home`：右手一邊伸出去扶砲塔（arm2_r ＋ hand2_r），一邊還留在胸前
+（arm_r1／arm_r2 ＋ hand_r），同時存在整整一段動作。yichui_2 同理是多一雙腳。
+
+根因：這類模型的「換手臂／換腿」是靠**部件不透明度**做的 —— model3.json 沒有
+pose3.json，動作檔裡是 `{"Target": "PartOpacity", "Id": "Part31", …}` 這種曲線。
+而 `CubismMotion::DoUpdateParameters` 的 PartOpacity 迴圈是這樣寫的：
+
+    parameterIndex = model->GetParameterIndex(curves[c].Id);   // ← 拿部件 id 去查參數
+    if (parameterIndex == -1) continue;
+    model->SetParameterValue(parameterIndex, value);
+
+它把部件 id 當成**參數** id 去查。`Part31` 只存在於部件表（實測 aidang_2 的 206 個
+參數中沒有任何一個叫 `Part*`），而 `CubismModel::GetParameterIndex()` 對查不到的 id
+**不會回 -1** —— 它會把 id 登記進 `_notExistParameterId` 並回傳 `parameterCount + n`
+這個假索引，值寫進 `_notExistParameterValues`。也就是說那個 `== -1` 的守衛是死碼。
+
+**但那個「假參數」不是黑洞** —— 它正是 `CubismPose` 的輸入通道：
+`CubismPose::PartData::Initialize()` 同樣用 `GetParameterIndex(PartId)` 取得那個假
+索引，`CubismPose::DoFade()` 再 `GetParameterValue(paramIndex) > Epsilon` 讀回來，
+決定群組裡哪一個部件該顯示。所以「PartOpacity 曲線 →（假）參數 → CubismPose →
+真正的 SetPartOpacity」是**有 pose3.json 的模型（官方樣本 Haru 那一類）的正常路徑**。
+
+問題只出在**沒有 pose3.json 的模型**：沒有人去讀那個假參數，整條曲線於是靜靜地
+沒有作用。Unity 版 runtime 是由 CubismPart 元件直接吃這些曲線的，所以同一批模型在
+遊戲裡正常，native 這條沒人接，症狀就是多出來的手腳，而且一句警告都沒有。
+實測使用者的碧藍航線語料庫 40 隻模型裡有 13 隻（33%）會踩到。
+
+修法：先用 `GetPartIndex()` 查，命中（索引要在 `GetPartCount()` 範圍內 —— 同樣得自己
+夾上界，`GetPartIndex` 對查不到的 id 也是回假索引而不是 -1）就 `SetPartOpacity()`。
+**刻意不寫 else／continue**，兩條都走：沒有 pose 的模型靠 `SetPartOpacity()` 那行，
+有 pose 的模型靠原本的假參數那條，而 pose 在動作之後才跑（`ModelController::update()`
+的第 10 步），會把上面那行覆寫掉 —— 兩者不衝突。只擋掉 `continue` 這件事很重要：
+第一版寫了 `continue`，有 pose 的模型會整組凍在每個群組的第一個部件上，一樣靜默。
+
+**刻意不套 fadeWeight**：這些曲線的用途是「A 手臂關掉、B 手臂打開」的硬切換，
+照參數那樣做淡入淡出的話，交叉淡入的那一秒兩組手臂會一起變半透明 —— 那正是
+這個 patch 要消滅的畫面。原本的程式碼也沒有套（是個沒有加權的 SetParameterValue），
+所以這一點是維持原語意。多支動作同時在佇列裡時，最後被求值的那一支（也就是最新
+起播的那一支）說了算，換動作的當下舊的那組就消失。
+
+套用方式見 cmake/FetchCubismFramework.cmake，每次 configure 會自動確認。
+
+授權：本檔是對 CubismNativeFramework 5-r.5 的 unified diff，context 行與被移除的行
+就是 Live2D 的原始碼，所以**這一份不適用本專案的 MIT 授權**，而是跟上游一樣受
+Live2D Open Software License 規範（見 THIRD_PARTY_NOTICES.md 第 1 節）：
+https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html
+
+diff --git a/src/Motion/CubismMotion.cpp b/src/Motion/CubismMotion.cpp
+index 702f85a..5332cc6 100644
+--- a/src/Motion/CubismMotion.cpp
++++ b/src/Motion/CubismMotion.cpp
+@@ -554,7 +554,25 @@ void CubismMotion::DoUpdateParameters(CubismModel* model, csmFloat32 userTimeSec
+ 
+     for (; c < _motionData->CurveCount && curves[c].Type == CubismMotionCurveTarget_PartOpacity; ++c)
+     {
+-        // Find parameter index.
++        // Evaluate curve and apply value.
++        value = EvaluateCurve(_motionData, c, time, isCorrection, duration);
++
++        // Apply to the part opacity when the curve id names a part of this model.
++        // Note: fadeWeight is deliberately not applied here. Part opacity curves are
++        // used as hard switches between alternative art (arms, legs, props); blending
++        // them makes both variants translucent at the same time.
++        const csmInt32 partIndex = model->GetPartIndex(curves[c].Id);
++        if (0 <= partIndex && partIndex < model->GetPartCount())
++        {
++            model->SetPartOpacity(partIndex, value);
++        }
++
++        // Find parameter index. Deliberately no "else": models that switch parts
++        // through CubismPose need this channel as well. PartData::Initialize() looks
++        // the part id up in the *parameter* table and CubismPose::DoFade() reads that
++        // slot back to decide which part of a group is visible, so skipping it would
++        // freeze every pose group on its first part. The pose pass runs after the
++        // motion, so on those models it simply overrides the SetPartOpacity() above.
+         parameterIndex = model->GetParameterIndex(curves[c].Id);
+ 
+         // Skip curve evaluation if no value in sink.
+@@ -563,9 +581,6 @@ void CubismMotion::DoUpdateParameters(CubismModel* model, csmFloat32 userTimeSec
+             continue;
+         }
+ 
+-        // Evaluate curve and apply value.
+-        value = EvaluateCurve(_motionData, c, time, isCorrection, duration);
+-
+         model->SetParameterValue(parameterIndex, value);
+     }
+ 
