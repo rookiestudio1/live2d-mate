@@ -23,7 +23,11 @@ env:
 
 jobs:
   windows:
-    runs-on: windows-latest
+    # 釘 windows-2022 而不是 windows-latest：後者在 2026-09 換成
+    # windows-2025-vs2026，只有 VS2026，下面的 -G "Visual Studio 17 2022"
+    # 會直接找不到編譯器。這個 job 不建主程式、用不到 Cubism Core，但 Qt 裝的
+    # 仍是 win64_msvc2022_64，工具集還是得對得上。完整理由見 release.yml 同一處。
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
