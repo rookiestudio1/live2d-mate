@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "app_controller.h"
+#include "core/perform_sync.h"
 
 namespace l2m {
 
@@ -35,12 +36,18 @@ void PerformRunner::runNext() {
 
   const PerformStep& step = steps_[index_];
 
-  if (step.action == "motion") {
-    finishStep(controller_.playMotion(step.group, step.index.value_or(-1), defaultPriority_));
+  // 押後到「真的開口」那一刻（見標頭與 core/perform_sync.h）。
+  // 這裡只排隊不執行，所以直接推進到下一步。
+  if (deferUntilSpeech(steps_, index_)) {
+    deferred_.push_back(index_);
+    ++index_;
+    runNext();
     return;
   }
-  if (step.action == "expression") {
-    finishStep(controller_.setExpression(step.name, step.holdMs));
+
+  // 後面沒有接 speak 的視覺步驟（或中間隔著 move／wait）照舊當場執行
+  if (isSpeechCompanionAction(step.action)) {
+    finishStep(runCompanionStep(step));
     return;
   }
   if (step.action == "move") {
@@ -60,14 +67,6 @@ void PerformRunner::runNext() {
       return;
     }
     finishStep(controller_.moveTo(step.x, step.y, step.preset));
-    return;
-  }
-  if (step.action == "parameters") {
-    finishStep(controller_.setParameters(step.params));
-    return;
-  }
-  if (step.action == "animate") {
-    finishStep(controller_.animate(step.keyframes, step.animateOptions));
     return;
   }
   if (step.action == "wait") {
@@ -92,13 +91,50 @@ void PerformRunner::runNext() {
     request.voice = step.voice;
     request.wait = step.speakWait;
     request.thinking = step.thinking;
+    // 押後的視覺步驟在「真的開口」那一刻放行 —— 跟氣泡同一拍
+    request.onSpeechStart = [self] {
+      if (self) self->flushDeferred();
+    };
     controller_.speak(request, [self](CommandResult result) {
-      if (self) self->finishStep(result);
+      if (!self) return;
+      // 保險：onSpeechStart 一次都沒觸發也不能把步驟弄丟（見標頭）
+      self->flushDeferred();
+      self->finishStep(result);
     });
     return;
   }
 
   finishStep(CommandResult::failure("Unknown step action: " + step.action));
+}
+
+CommandResult PerformRunner::runCompanionStep(const PerformStep& step) {
+  if (step.action == "motion") return controller_.playMotion(step.group, step.index.value_or(-1), defaultPriority_);
+  if (step.action == "expression") return controller_.setExpression(step.name, step.holdMs);
+  if (step.action == "parameters") return controller_.setParameters(step.params);
+  if (step.action == "animate") return controller_.animate(step.keyframes, step.animateOptions);
+  return CommandResult::failure("Unknown step action: " + step.action);
+}
+
+void PerformRunner::flushDeferred() {
+  if (finished_ || deferred_.empty()) return;
+  // 先整份搬走：某一步失敗時 finish() 會沿著 done_ 走出去，那條路上不該
+  // 再看到一份清到一半的清單
+  std::vector<size_t> pending;
+  pending.swap(deferred_);
+
+  for (size_t i : pending) {
+    const PerformStep& step = steps_[i];
+    const CommandResult result = runCompanionStep(step);
+    if (result.ok) continue;
+    if (bestEffort_) {
+      qDebug() << "[idle] 自主表演步驟失敗，跳過:" << i + 1 << QString::fromStdString(step.action) << QString::fromStdString(result.error);
+      continue;
+    }
+    // 報的是「第幾步」而不是「第幾個押後的」—— AI 看到的步號要跟它自己送的
+    // 陣列對得起來，押後純粹是內部的時序調整
+    finish(CommandResult::failure("Step " + std::to_string(i + 1) + " (" + step.action + ") failed: " + result.error, result.hint));
+    return;
+  }
 }
 
 void PerformRunner::finishStep(const CommandResult& result) {

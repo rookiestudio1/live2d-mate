@@ -30,7 +30,7 @@ SpeechController::SpeechController(ConfigStore& config, TtsManager& tts, AudioPl
 
   // 保險：等第一個聲音等太久就先把字放出來（入口④，見標頭）
   bubbleDelay_.setSingleShot(true);
-  connect(&bubbleDelay_, &QTimer::timeout, this, [this] { showBubbleOnce("保險到期"); });
+  connect(&bubbleDelay_, &QTimer::timeout, this, [this] { markSpeechStart("保險到期"); });
 
   connect(&player_, &AudioPlayer::finished, this, [this] { completeCurrent(); });
 
@@ -39,7 +39,7 @@ SpeechController::SpeechController(ConfigStore& config, TtsManager& tts, AudioPl
   // 氣泡也是（入口①）—— 字與聲音一起出現，才對得上使用者眼裡的「開口」。
   connect(&player_, &AudioPlayer::started, this, [this] {
     playerStarted_ = true;
-    showBubbleOnce("跟著聲音");
+    markSpeechStart("跟著聲音");
     if (current_ && !current_->request.wait) answer(CommandResult::success());
   });
 }
@@ -100,6 +100,7 @@ void SpeechController::runNext() {
   bubbleShown_ = false;
   committedError_.clear();
   streamMime_.clear();
+  speechStarted_ = false;
   speechClock_.restart();
 
   const AppConfig& cfg = config_.get();
@@ -111,7 +112,7 @@ void SpeechController::runNext() {
       completeCurrent();
       return;
     }
-    showBubbleOnce("mutter");
+    markSpeechStart("mutter");
     const size_t chars = strutil::utf8Length(current_->request.text);
     const double duration = std::clamp(static_cast<double>(chars) * kMutterMsPerChar, cfg.tts.bubbleMinDuration, kMutterMaxMs);
     bubbleHold_.start(static_cast<int>(duration));
@@ -129,9 +130,9 @@ void SpeechController::runNext() {
   // 根本不會有聲音的話立刻顯示（入口②），否則掛上保險期限（入口④）。
   // bubbleMaxDelay 為 0 代表使用者要回到「開始合成就顯示」的舊行為。
   if (!playerOpen_) {
-    showBubbleOnce("沒有音訊裝置");
+    markSpeechStart("沒有音訊裝置");
   } else if (cfg.tts.bubbleMaxDelay <= 0) {
-    showBubbleOnce("不等聲音");
+    markSpeechStart("不等聲音");
   } else {
     bubbleDelay_.start(static_cast<int>(cfg.tts.bubbleMaxDelay));
   }
@@ -193,7 +194,7 @@ void SpeechController::finishSynthesis(const std::string& engine, const std::str
     // 氣泡可能還沒放出來（保險期限還沒到就先收到錯誤），這裡是入口③。
     player_.stop();
     playerOpen_ = false;
-    showBubbleOnce("合成失敗");
+    markSpeechStart("合成失敗");
     bubbleHold_.start(static_cast<int>(config_.get().tts.bubbleMinDuration));
     // wait=false 的回覆平常掛在 started() 上，沒出聲就得在這裡補
     if (!current_->request.wait) answer(CommandResult::success());
@@ -206,6 +207,18 @@ void SpeechController::answer(CommandResult result) {
   if (!current_ || current_->answered) return;
   current_->answered = true;
   if (current_->done) current_->done(std::move(result));
+}
+
+void SpeechController::markSpeechStart(const char* reason) {
+  if (!current_) return;
+  // **押後的視覺步驟排在氣泡之前**：下面那一句 showText 第一次跑要付
+  // DirectWrite 的字型後援（實測 1398 ms，全落在 GUI 執行緒上），
+  // 排在它後面的話動作會硬生生晚那麼多才起播。
+  if (!speechStarted_) {
+    speechStarted_ = true;
+    if (current_->request.onSpeechStart) current_->request.onSpeechStart();
+  }
+  showBubbleOnce(reason);
 }
 
 void SpeechController::showBubbleOnce(const char* reason) {
@@ -259,6 +272,7 @@ CommandResult SpeechController::stopSpeaking() {
   playerOpen_ = false;
   playerStarted_ = false;
   bubbleShown_ = false;
+  speechStarted_ = false;
   committedError_.clear();
 
   bubbleHold_.stop();

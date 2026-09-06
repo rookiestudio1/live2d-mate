@@ -371,6 +371,7 @@ add_library(
   src/core/qt_timer_host.cpp
   src/core/perform_step.h
   src/core/perform_step.cpp
+  src/core/perform_sync.cpp
   src/core/tts_types.h
   src/core/voice_list.h
   src/core/voice_list.cpp
@@ -976,6 +977,7 @@ if(L2M_BUILD_TESTS)
   l2m_add_test(test_external_model)
   l2m_add_test(test_png_probe)
   l2m_add_test(test_layout_fit)
+  l2m_add_test(test_perform_sync)
 endif()
 
 # ---------------------------------------------------------------------------

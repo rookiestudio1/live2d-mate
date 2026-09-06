@@ -6,6 +6,17 @@
 // 每一步做完（或它的非同步回呼觸發）才推進下一步。wait 靠 QTimer，
 // speak{wait:true} 靠 SpeechController 的完成回呼，其餘都是同步的。
 //
+// **視覺步驟會押後到「真的開口」那一刻**（哪些算，見 core/perform_sync.h）。
+// AI 的典型序列 [expression, motion, speak] 嚴格照順序跑的話，動作在 t=0
+// 就演完了，聲音卻要等 TTS 的一整趟往返 —— 實測 custom 引擎 2.35／2.48 秒，
+// 中間既沒有聲音也沒有氣泡，看起來像對不上嘴的配音。所以
+// motion／expression／parameters／animate 後面若緊接著 speak，先押進
+// deferred_ 不執行，等 SpeakRequest::onSpeechStart 觸發（跟氣泡同一個閘門，
+// 見 app/speech_controller.h）才整批放出來。
+// **押後不等於可以弄丟**：speak 的 done 回呼上還有一次 flushDeferred()，
+// 涵蓋 onSpeechStart 一次都沒觸發的路徑（stop_speaking 中途打斷、
+// 沒有接上 speakHandler 的建置）。押後是時序調整，不是「有機會就跳過」。
+//
 // 自己管生命週期：跑完（或失敗）呼叫 done 之後 deleteLater()，
 // 呼叫端不必持有它。app 結束時 QObject 的親子關係會一起收掉。
 
@@ -52,6 +63,11 @@ public:
 
 private:
   void runNext();
+  // 同步執行一個視覺步驟（motion／expression／parameters／animate）。
+  // 押後與不押後兩條路共用同一支，才不會有一條偷偷少傳 defaultPriority_
+  CommandResult runCompanionStep(const PerformStep& step);
+  // 放行押後的步驟。失敗的處理與 finishStep 一致：bestEffort 跳過，否則整段中止
+  void flushDeferred();
   void finishStep(const CommandResult& result);
   void finish(CommandResult result);
 
@@ -59,6 +75,8 @@ private:
   std::vector<PerformStep> steps_;
   std::function<void(CommandResult)> done_;
   size_t index_ = 0;
+  // 押後到「開口那一刻」的視覺步驟，存的是 steps_ 的索引（錯誤訊息要報第幾步）
+  std::vector<size_t> deferred_;
   bool finished_ = false;
   bool bestEffort_ = false;
   std::optional<int> defaultPriority_;

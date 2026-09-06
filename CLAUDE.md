@@ -51,7 +51,7 @@ cmake --build build
 cmake -S . -B build -G Ninja ... -DL2M_BUILD_TESTS=OFF
 
 # 不建主程式（預設 ON）。這種建置**完全不需要 Cubism Core**：不 include
-# SetupCubismCore、不抓 Framework、只留 l2m_core 與 82 支測試，Qt 也只要
+# SetupCubismCore、不抓 Framework、只留 l2m_core 與 83 支測試，Qt 也只要
 # Core/Network/Test。CI 走的就是這條（.github/workflows/tests.yml）。
 # Viewer 的預設值跟著這個開關走，所以這條命令列不必再多關一個。
 cmake -S . -B build -G Ninja ... -DL2M_BUILD_APP=OFF
@@ -268,7 +268,7 @@ widget 上，主視窗的 `keyPressEvent` 根本收不到；進全螢幕順手�
 （M0 實測 QOpenGLWidget 在那個情境下合成不到螢幕），嵌在版面裡沒有那個限制；
 Cubism 的 `DoDrawModel` 會存下並還原當前 FBO，所以畫進 widget 自己的 FBO 沒問題。
 
-**最重要的一條規則**：82 個測試全部只連 `l2m_core`（見 `CMakeLists.txt` 的 `l2m_add_test()`）。
+**最重要的一條規則**：83 個測試全部只連 `l2m_core`（見 `CMakeLists.txt` 的 `l2m_add_test()`）。
 所以「決策邏輯放 `src/core/`，Qt/GL/OS 互動放其他目錄」不是風格建議，而是能不能被測到的分界。
 專案裡已經有好幾處是為了這條而拆開的，且都在標頭註解裡寫明理由：
 `core/tray_label.h`（vs `windows/tray.cpp`）、`core/autostart_command.h`（vs `platform/`）、
@@ -895,7 +895,7 @@ Format Code 走的就是它 —— **改動請照它的產出走**，手寫成�
   `qDebug`/`qWarning` 則是中文並帶 `[mcp]`、`[tts]`、`[live2d]`、`[config]`、`[perf]` 之類的子系統前綴。
 - 檔名 `snake_case.{h,cpp}`、`#pragma once`、平台實作用 `_win.cpp` 後綴。
 - **Qt Designer（`.ui`）只用在 `src/windows/settings/`**，`AUTOUIC` 也只開在 `live2d_mate` 這個 target 上
-  （`l2m_core` 與 82 個測試沒有 `.ui`，開全域只是每次 configure 多跑一次掃描）。
+  （`l2m_core` 與 83 個測試沒有 `.ui`，開全域只是每次 configure 多跑一次掃描）。
   `.ui` 與 `.cpp` **同層**放置，AUTOUIC 預設就找得到，不必設 `AUTOUIC_SEARCH_PATHS`；
   `.ui` 的 `<class>`、檔名、C++ 類別名三者一致。`.gitattributes` 把 `*.ui` 釘成 LF。
   **`.ui` 裡不寫註解**（Designer 重存會刪掉），說明寫在對應 `.h` 的區塊註解裡，

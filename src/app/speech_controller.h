@@ -25,6 +25,13 @@
 //                                  要等到 timeoutMs 才知道失敗。逾時就先把字放出來。
 // 原本是「開始合成就顯示」，於是本機 TTS 上字會比聲音早兩秒出現。
 // 代價是氣泡的可見時長少掉開口延遲那一段 —— 那是字幕化的自然結果。
+//
+// **「真的開口了」那一刻在等的不只有氣泡**：perform 押後的視覺步驟（動作、
+// 表情）也接在同一個閘門上（Request::onSpeechStart，規則在 core/perform_sync.h）。
+// 使用者眼裡「角色開口」只有一個瞬間，字、聲音與動作都該落在那一拍。
+// 一次性旗標刻意分成兩個（speechStarted_ vs bubbleShown_）—— 氣泡自己還有
+// tts.showBubble 這個開關，共用的話「關掉氣泡」會連押後的動作一起吃掉，
+// 症狀是動作整個不見。
 
 #include <QElapsedTimer>
 #include <QObject>
@@ -62,6 +69,11 @@ public:
     // 三件事都只是把旗標往下傳 —— 外型交給 BubbleWindow，另外兩件交給
     // AudioPlayer::Effects，這裡不做任何判斷。
     bool thinking = false;
+    // 「真的開口了」的一次性通知（見上面的閘門說明）。perform 押後的視覺步驟
+    // 靠它放行；沒人設就是空的，整條路等於不存在。
+    // **在 showText 之前呼叫** —— 第一次建氣泡視窗要付 DirectWrite 的字型後援
+    // （實測 1398 ms），排在後面的話動作會晚那麼多才起播。
+    std::function<void()> onSpeechStart;
   };
 
   SpeechController(ConfigStore& config, TtsManager& tts, AudioPlayer& player, BubbleWindow& bubble, QObject* parent = nullptr);
@@ -108,6 +120,11 @@ private:
   // 一句結束：收氣泡、回呼、跑下一句
   void completeCurrent();
   void answer(CommandResult result);
+  // 「開始出聲」的統一閘門：先放行押後的視覺步驟，再顯示氣泡。
+  // 四個入口（見標頭）一律走這裡，不要直接呼叫 showBubbleOnce ——
+  // 少接一個入口的症狀是「某些情況下動作永遠不演」，而那幾個入口正是
+  // 沒有音效裝置、合成失敗這類本來就難重現的路徑。
+  void markSpeechStart(const char* reason);
   // 把這一句的氣泡放出來（四個入口共用，重複呼叫無效）。
   // reason 是入口名稱，只進 log —— 光看毫秒數分不出「跟著聲音」與「保險到期」，
   // 兩者在慢引擎上只差幾百毫秒，而那正是這個功能對錯的分界。
@@ -136,6 +153,8 @@ private:
 
   // 這一句的氣泡已經放出來了嗎（四個入口共用，先到先生效）
   bool bubbleShown_ = false;
+  // 這一句的 onSpeechStart 已經發過了嗎。與 bubbleShown_ 分開的理由見標頭
+  bool speechStarted_ = false;
 
   // 沒有音訊時，氣泡至少顯示這麼久
   QTimer bubbleHold_;

@@ -63,6 +63,10 @@ public:
     bool wait = false;
     // 思考（MCP 的 think 工具）：思考泡泡＋帶殘響的聲音＋嘴巴不動
     bool thinking = false;
+    // 「真的開口了」的一次性通知（app/speech_controller.h 的閘門）。
+    // perform 押後的視覺步驟靠它跟聲音對齊，見 core/perform_sync.h；
+    // 沒人設就是空的，整條路等於不存在。
+    std::function<void()> onSpeechStart;
   };
 
   AppController(ConfigStore& config, CharacterWindow& window, WindowManager& windowManager, std::filesystem::path modelsDir, std::filesystem::path personasDir, std::filesystem::path memoryDir,

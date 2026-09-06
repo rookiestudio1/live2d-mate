@@ -307,6 +307,7 @@ int main(int argc, char* argv[]) {
     job.rate = request.rate;
     job.wait = request.wait;
     job.thinking = request.thinking;
+    job.onSpeechStart = request.onSpeechStart;
     speech.speak(job, std::move(done));
   };
   // 嘀咕（自主台詞的 bubble 模式）：走 SpeechController 的同一條佇列，
