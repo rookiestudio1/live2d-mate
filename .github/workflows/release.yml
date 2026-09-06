@@ -175,8 +175,24 @@ jobs:
 
       # install 規則是平放版面：exe 旁邊直接是 i18n/、FrameworkShaders/、Qt DLL
       # 與授權文件。理由寫在 CMakeLists.txt 的安裝段註解裡。
+      #
+      # --prefix **必須是絕對路徑**。Qt 的部署腳本（l2m_install_qt_deploy 產生的
+      # 那一支）最後會呼叫 qt6_deploy_qt_conf 去寫 qt.conf，而它對相對路徑是
+      # 直接 FATAL_ERROR：
+      #   Qt6CoreDeploySupport.cmake:38 (message):
+      #     Given qt.conf path is not an absolute path: 'dist/live2d_mate/./qt.conf'
+      # 陰險的地方在於**前面每一條 install 規則都會照常成功** —— exe、i18n/、
+      # FrameworkShaders/、授權文件全裝完了才炸在 Qt DLL 這一步，所以 log 看起來
+      # 像是「裝到一半莫名其妙死掉」，而不是「參數給錯了」。
       - name: Install into package layout
-        run: cmake --install build --config RelWithDebInfo --prefix dist/live2d_mate
+        shell: pwsh
+        run: |
+          # 斜線統一成 /：CMake 內部一律用正斜線。用 .NET 的 .Replace() 而不是
+          # PowerShell 的 -replace —— 後者的樣式是**正規表示式**，單獨一個
+          # 反斜線會被當成沒寫完的逃脫序列，當場丟例外。
+          $prefix = $PWD.Path.Replace('\', '/') + '/dist/live2d_mate'
+          Write-Host "安裝前綴 $prefix"
+          cmake --install build --config RelWithDebInfo --prefix $prefix
 
       - name: Show package contents
         shell: pwsh
