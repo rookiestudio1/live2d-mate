@@ -9,7 +9,7 @@ name: tests
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
 
 # 同一個分支連推兩次時，把還在跑的前一輪取消掉
