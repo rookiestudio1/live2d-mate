@@ -79,6 +79,22 @@ set(WITH_VPCLMULQDQ OFF CACHE BOOL "" FORCE)
 set(WITH_PCLMULQDQ OFF CACHE BOOL "" FORCE)
 set(WITH_SSE42 OFF CACHE BOOL "" FORCE)
 
+# zlib-ng 自己有 install() 規則（靜態庫、三份標頭、zlib.pc 與 ZLIB-targets.cmake）。
+# 本專案 install 出來的是**給終端使用者的桌寵**，不是給人拿去連結的 SDK，那些
+# 開發用檔案裝進 dist/ 與 NSIS 安裝檔只是雜訊 —— 實測第一版打包出來的套件多了
+# include/ 3 個檔與 lib/ 9 個檔（zconf.h、zlib.h、zlib_name_mangling.h、
+# lib/pkgconfig/zlib.pc、lib/cmake/ZLIB/*.cmake…），使用者的安裝目錄底下平白
+# 多出兩個看不懂的資料夾。
+#
+# 它那三個 install 區塊都寫成 `if(NOT SKIP_INSTALL_xxx AND NOT SKIP_INSTALL_ALL)`
+# （zlib 家族的傳統開關），所以關掉只要這一個變數。
+#
+# 刻意用**一般變數**而不是 CACHE：FetchContent_MakeAvailable 底下就是
+# add_subdirectory，子 scope 讀得到父 scope 的變數，用完 unset 就只影響
+# zlib-ng 這一個子專案。SKIP_INSTALL_ALL 是通用慣例名，寫進 cache 會連日後
+# 才加進來的其他子專案一起關掉 —— 那不是這支檔案該替它們決定的事。
+set(SKIP_INSTALL_ALL ON)
+
 # BUILD_SHARED_LIBS 是 zlib-ng 決定要不要另外產一份 DLL 的依據。本專案全靜態，
 # 但這是全域變數，用完要還原 —— 同一個 scope 後面還有別人的 CMake 會讀它。
 #
@@ -98,6 +114,7 @@ if(l2m_had_build_shared)
 else()
   unset(BUILD_SHARED_LIBS)
 endif()
+unset(SKIP_INSTALL_ALL)
 
 # 它的警告不是我們該修的，跟 Framework 一樣別讓它洗版
 if(MSVC)
