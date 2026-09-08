@@ -101,7 +101,7 @@ CI 在 `.github/workflows/`：`tests.yml` 每次 push/PR 跑測試（`L2M_BUILD_
 
 ```bash
 build/rel/live2d_mate.exe                  # 一般啟動（single-instance；第二次啟動只會叫醒第一個）
-build/rel/live2d_mate.exe --hidden         # 縮在系統匣啟動（開機自動啟動用）
+build/rel/live2d_mate.exe --hidden         # 縮在系統匣啟動（只剩手動用；開機自動啟動已不再帶這個旗標）
 build/rel/live2d_mate.exe --mcp-stdio [url] [token]   # stdio↔HTTP 橋接（Claude Desktop 用）
 build/rel/live2d_mate.exe --set-model "E:/any/where/Foo.model3.json"  # 用這隻外部模型（見下）
 

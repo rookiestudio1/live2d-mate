@@ -7,10 +7,13 @@
 	  隨 app bundle 放在 Contents/Library/LaunchAgents/。
 
 	  為什麼不用 SMAppService.mainAppService（比較短的那條路）：
-	  mainAppService 註冊的是 app bundle 本身，launchd 不帶任何參數把它叫起來，
-	  收不到 --hidden，登入自啟就會整隻角色跳出來。改成自己帶一份 agent plist，
-	  ProgramArguments 就能像 Windows 的 HKCU\...\Run 一樣把旗標寫死進去，
-	  兩個平台的 shouldStartHidden() 因此可以是同一份純 argv 邏輯。
+	  當初是為了「把隱藏旗標寫進 ProgramArguments」，而登入自啟已經不帶那個旗標了
+	  （理由見 src/core/autostart_command.h）。仍然維持 agent 的原因見
+	  src/platform/autostart_mac.mm —— 換過去會讓已註冊使用者手上這份 agent
+	  留在 launchd 裡繼續 RunAtLoad，登入時被叫起來兩次。
+
+	  註：XML 註解裡不可以出現連續兩個減號（會直接是 malformed XML），
+	  所以這裡一律寫「隱藏旗標」而不是旗標本身。原本那份就踩了這條。
 
 	  BundleProgram 是「相對於 bundle 的路徑」，所以使用者把 .app 搬到哪都還能跑；
 	  寫絕對路徑的話搬一次就壞了。
@@ -21,11 +24,13 @@
 	<key>BundleProgram</key>
 	<string>Contents/MacOS/live2d_mate</string>
 
-	<!-- argv[0] 照慣例放程式名，真正有意義的是後面那個旗標 -->
+	<!--
+	  只有 argv[0]，照慣例放程式名 —— 自啟就是一次普通的啟動，不帶任何旗標。
+	  真正執行的是上面的 BundleProgram。
+	-->
 	<key>ProgramArguments</key>
 	<array>
 		<string>live2d_mate</string>
-		<string>--hidden</string>
 	</array>
 
 	<key>RunAtLoad</key>

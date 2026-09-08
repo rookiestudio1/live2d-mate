@@ -246,6 +246,12 @@ int main(int argc, char* argv[]) {
 
   l2m::i18n::setMessagesDir(resolveI18nDir());
 
+  // 舊版的自啟項寫的是「exe --hidden」，於是登入自啟那次沒有角色也沒有 splash、
+  // 只剩一個托盤圖示。改掉產生器救不了已經開著自啟的人（那一行只在按核取方塊時才寫），
+  // 所以在這裡看一眼、是舊格式就就地改寫。判別與「什麼都不改寫」的理由見
+  // core/autostart_command.h 的 needsHiddenFlagStripped()。
+  l2m::platform::refreshOpenAtLogin();
+
   // ── 啟動 Splash 子行程 ──
   // 為什麼是另一個行程而不是這個行程裡的視窗：模型載入會把這裡的 GUI
   // 執行緒整個卡住數秒（光是 CreateRenderer 的 shader 編譯就 2.3 秒），

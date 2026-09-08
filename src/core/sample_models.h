@@ -44,9 +44,11 @@ std::string sampleModelsUrl(const std::string& uiLocale);
 //   ① 真的一隻模型都沒有；
 //   ② 還沒問過（config 的 app.sampleModelsPrompted）—— 只記「問過」不記答案，
 //      每次啟動都彈一個對話框比沒有模型更煩人；
-//   ③ 不是 --hidden 啟動 —— 那條是開機自動啟動走的，使用者要的是安靜地縮在
-//      系統匣，登入時彈一個 modal 完全違反那個意圖。這種情況**不記旗標**，
+//   ③ 不是 --hidden 啟動 —— 那次啟動使用者要的是安靜地縮在系統匣，
+//      對著一個看不見的角色彈 modal 完全違反那個意圖。這種情況**不記旗標**，
 //      留到下次正常啟動再問。
+//      （開機自動啟動**已經不走這條**了，見 core/autostart_command.h：自啟就是
+//       一次普通的啟動，角色會顯示，所以沒有模型時本來就該當場問。）
 bool shouldOfferSampleModels(bool anyModelInstalled, bool alreadyPrompted, bool startedHidden);
 
 }  // namespace l2m

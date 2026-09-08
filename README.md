@@ -159,12 +159,13 @@ redistributed through the repository.
 
 ```bash
 build/rel/live2d_mate.exe                             # normal launch (single instance)
-build/rel/live2d_mate.exe --hidden                    # start minimized to the tray
+build/rel/live2d_mate.exe --hidden                    # start minimized to the tray (manual only)
 build/rel/live2d_mate.exe --mcp-stdio [url] [token]   # stdio <-> HTTP bridge
 ```
 
 Launching a second time just wakes the first instance up. On macOS and Linux the binary has
-no `.exe` suffix — same commands otherwise.
+no `.exe` suffix — same commands otherwise. Launch-at-login runs the plain first form on all
+three platforms: the character and the splash show up exactly as they do on a manual launch.
 
 Diagnostic environment variables: `L2M_PROFILE` (per-stage frame timings every 2 s),
 `L2M_SAY` (say one line 3 s after startup — a one-shot check of synth to playback to bubble

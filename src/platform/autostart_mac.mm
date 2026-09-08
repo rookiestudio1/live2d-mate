@@ -3,12 +3,12 @@
 // 用 SMAppService（macOS 13+）而不是舊的 LSSharedFileList：後者從 10.11 起
 // 就標為 deprecated，新的 SDK 已經拿不到。
 //
-// 註冊的是「隨 bundle 附的 launchd agent」而不是 mainAppService：
-// mainAppService 是叫 launchd 直接把 app bundle 啟起來，不帶任何參數，
-// 收不到 --hidden，登入自啟就會整隻角色跳出來。自己帶一份 agent plist，
-// 就能把旗標寫進 ProgramArguments，語意跟 Windows 的 HKCU\...\Run 完全一致 ——
-// 於是 core/autostart_command.h 的 shouldStartHidden() 兩個平台共用同一份 argv 邏輯，
-// 不需要任何 macOS 專用的第二參數。
+// 註冊的是「隨 bundle 附的 launchd agent」而不是 mainAppService。
+// 當初挑它的理由是「要能把 --hidden 寫進 ProgramArguments」，而**那個理由已經沒有了**
+//（自啟不再帶旗標，見 core/autostart_command.h）；仍然維持 agent 的原因是換過去有實害：
+// 已經註冊過的使用者機器上那份 agent 還在 launchd 裡掛著 RunAtLoad，
+// 改用 mainAppService 不會順手把它撤掉，登入時就會被叫起來兩次
+// —— 而換過去一點好處都沒有（顯示名稱本來就靠 AssociatedBundleIdentifiers 解決了）。
 // plist 的內容與各鍵的理由見 resources/macos/com.live2dmate.app.login.plist。
 //
 // 注意：SMAppService 認的是 app bundle（要有 CFBundleIdentifier，
@@ -48,6 +48,10 @@ void setOpenAtLogin(bool enabled) {
     qWarning() << "[autostart] 開機自啟需要 macOS 13 以上";
   }
 }
+
+// macOS 不需要遷移：參數寫在隨 app bundle 出貨的 plist 裡（不像 Windows 的註冊表
+// 與 Linux 的 .desktop 是安裝當下寫進使用者家目錄的一份複本），app 一更新就跟著換掉了。
+void refreshOpenAtLogin() {}
 
 bool isOpenAtLogin() {
   if (@available(macOS 13.0, *)) {
